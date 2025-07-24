@@ -1,0 +1,45 @@
+/* src/components/Header.module.css */
+.header {
+    background-color: #282c34;
+    padding: 15px 20px;
+    color: white;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.header nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.logo {
+    /* No need for .header prefix here as CSS Modules localizes it */
+    font-size: 1.8em;
+    font-weight: bold;
+    color: #61dafb;
+}
+
+.nav-links {
+    /* No need for .header prefix here as CSS Modules localizes it */
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+}
+
+.nav-links li {
+    margin-left: 25px;
+}
+
+.nav-links a {
+    color: white;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+.nav-links a:hover {
+    color: #61dafb;
+}
