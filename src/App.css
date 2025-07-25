@@ -31,3 +31,59 @@ h1, h2, h3 {
 .content-section {
     padding: 20px 0;
 }
+
+/* Example for App.css or StudentManagement.css */
+.action-btn {
+  padding: 0.5rem 0.8rem;
+  font-size: 0.9rem;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-left: 5px;
+  /* Space between buttons */
+  border: none;
+}
+
+.edit-btn {
+  background: #007bff;
+  /* Blue */
+  color: white;
+}
+
+.edit-btn:hover {
+  background: #0056b3;
+}
+
+.delete-btn {
+  background: #dc3545;
+  /* Red */
+  color: white;
+}
+
+.delete-btn:hover {
+  background: #c82333;
+}
+
+.table-container {
+  /* Also from admin.css */
+  overflow-x: auto;
+  /* For responsive tables */
+  margin-top: 20px;
+}
+
+#studentTable {
+  /* Basic table style */
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+#studentTable th,
+#studentTable td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+
+#studentTable th {
+  background-color: #f2f2f2;
+}
