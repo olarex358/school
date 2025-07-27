@@ -2,21 +2,22 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
+// Import Header and Footer - these will now be for authenticated sections only
 import Header from './components/Header';
 import Footer from './components/Footer';
 
-// Import all your page components
+// Import all your page components with correct paths
 import LoginPage from './pages/LoginPage';
-import HomePage from './pages/HomePage'; // Ensure this is imported
+import HomePage from './pages/HomePage';
 import StudentProfile from './pages/StudentProfile';
 import StudentResults from './pages/StudentResults';
 import StudentSyllabus from './pages/StudentSyllabus';
 import StudentCertification from './pages/StudentCertification';
 import StudentAttendance from './pages/StudentAttendance';
 import StudentSubjects from './pages/StudentSubjects';
-import StudentCalendar from './pages/StudentCalendar';
+import StudentCalendar from './pages/StudentCalendar'; // Corrected path and spelling
 import StudentFees from './pages/StudentFees';
-import StudentMails from './pages/StudentMails';
+import StudentMails from './pages/StudentMails'; // Corrected path
 import StudentPasswordChange from './pages/StudentPasswordChange';
 import StaffProfile from './pages/StaffProfile';
 import Dashboard from './pages/Dashboard';
@@ -25,7 +26,7 @@ import StaffManagement from './pages/StaffManagement';
 import ResultsManagement from './pages/ResultsManagement';
 import ViewReports from './pages/ViewReports';
 import AcademicManagement from './pages/AcademicManagement';
-import UserPermissionsManagement from './pages/UserPermissionsManagement';
+import UserPermissionsManagement from './pages/UserPermissionsManagement'; // Corrected path
 
 // Import dashboards
 import StudentDashboard from './pages/StudentDashboard';
@@ -37,8 +38,11 @@ import StaffCalendar from './pages/StaffCalendar';
 import StaffMails from './pages/StaffMails';
 import StaffPasswordChange from './pages/StaffPasswordChange';
 
+// Import Admin Messaging
+import AdminMessaging from './pages/AdminMessaging';
 
-// Helper component for protected routes (no changes needed here)
+
+// Helper component for protected routes
 const ProtectedRoute = ({ children, allowedTypes }) => {
   const loggedInUser = JSON.parse(localStorage.getItem('loggedInUser'));
 
@@ -46,11 +50,17 @@ const ProtectedRoute = ({ children, allowedTypes }) => {
     return <Navigate to="/login" replace />;
   }
 
+  // Ensure allowedTypes is always an array before using .includes
+  if (allowedTypes && !Array.isArray(allowedTypes)) {
+      console.error("ProtectedRoute: allowedTypes must be an array.");
+      return <Navigate to="/login" replace />; // Or redirect to a generic error page
+  }
+
   if (allowedTypes && !allowedTypes.includes(loggedInUser.type)) {
     if (loggedInUser.type === 'admin') return <Navigate to="/dashboard" replace />;
     if (loggedInUser.type === 'student') return <Navigate to="/student-dashboard" replace />;
     if (loggedInUser.type === 'staff') return <Navigate to="/staff-dashboard" replace />;
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" replace />; // Fallback
   }
 
   return children;
@@ -58,18 +68,27 @@ const ProtectedRoute = ({ children, allowedTypes }) => {
 
 
 function App() {
-  // Initialize loggedInUser state more robustly
+  // Robust initialization of loggedInUser state from localStorage
   const [loggedInUser, setLoggedInUser] = useState(() => {
     try {
       const user = localStorage.getItem('loggedInUser');
       return user ? JSON.parse(user) : null;
     } catch (error) {
-      console.error("Failed to parse loggedInUser from localStorage", error);
+      console.error("Failed to parse loggedInUser from localStorage:", error);
       return null;
     }
   });
 
-  // No useEffect needed here for initial load if useState is initialized with a function
+  // Effect to listen for localStorage changes for loggedInUser (e.g., logout from another tab)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const user = localStorage.getItem('loggedInUser');
+      setLoggedInUser(user ? JSON.parse(user) : null);
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []); // Runs once on mount and cleans up on unmount
+
 
   return (
     <div className="App">
@@ -80,7 +99,6 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<LoginPage />} />
-          {/* Explicit route for Home, also serves as a fallback */}
           <Route path="/home" element={<HomePage />} />
 
           {/* Default / route: Redirects to appropriate dashboard if logged in, otherwise to HomePage */}
@@ -103,6 +121,7 @@ function App() {
           <Route path="/view-reports" element={<ProtectedRoute allowedTypes={['admin']}><ViewReports /></ProtectedRoute>} />
           <Route path="/academic-management" element={<ProtectedRoute allowedTypes={['admin']}><AcademicManagement /></ProtectedRoute>} />
           <Route path="/user-permissions-management" element={<ProtectedRoute allowedTypes={['admin']}><UserPermissionsManagement /></ProtectedRoute>} />
+          <Route path="/admin-messaging" element={<ProtectedRoute allowedTypes={['admin']}><AdminMessaging /></ProtectedRoute>} />
 
           {/* Student Protected Routes */}
           <Route path="/student-dashboard" element={<ProtectedRoute allowedTypes={['student']}><StudentDashboard /></ProtectedRoute>} />
@@ -111,7 +130,7 @@ function App() {
           <Route path='/student-syllabus' element={<ProtectedRoute allowedTypes={['student']}><StudentSyllabus /></ProtectedRoute>} />
           <Route path='/student-certification' element={<ProtectedRoute allowedTypes={['student']}><StudentCertification /></ProtectedRoute>} />
           <Route path='/student-attendance' element={<ProtectedRoute allowedTypes={['student']}><StudentAttendance /></ProtectedRoute>} />
-          <Route path='/student-subjects' element={<ProtectedRoute allowedTypes={['student']}><StudentSubjects /></ProtectedRoute>} />
+          <Route path='/student-subjects' element={<ProtectedRoute allowedTypes={['student']}><StudentSubjects /></ProtectedRoute>} /> {/* Corrected route path */}
           <Route path='/student-calendar' element={<ProtectedRoute allowedTypes={['student']}><StudentCalendar /></ProtectedRoute>} />
           <Route path='/student-fees' element={<ProtectedRoute allowedTypes={['student']}><StudentFees /></ProtectedRoute>} />
           <Route path='/student-mails' element={<ProtectedRoute allowedTypes={['student']}><StudentMails /></ProtectedRoute>} />

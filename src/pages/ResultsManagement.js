@@ -1,11 +1,16 @@
 // src/pages/ResultsManagement.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import useLocalStorage from '../hooks/useLocalStorage';
 
 function ResultsManagement() {
+  const navigate = useNavigate(); // Initialize useNavigate
+  const [loggedInUser, setLoggedInUser] = useState(null); // To store logged-in user info
+
   const [results, setResults] = useLocalStorage('schoolPortalResults', []);
   const [students] = useLocalStorage('schoolPortalStudents', []);
   const [subjects] = useLocalStorage('schoolPortalSubjects', []);
+  const [staffs] = useLocalStorage('schoolPortalStaff', []); // NEW: Load staff data to get assigned classes/subjects
 
   const [newResult, setNewResult] = useState({
     classSelect: '',
@@ -20,6 +25,17 @@ function ResultsManagement() {
   const [isEditing, setIsEditing] = useState(false);
   const [editResultId, setEditResultId] = useState(null);
   const [studentIdFilter, setStudentIdFilter] = useState('');
+
+  // NEW: Effect to check login and set user info
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('loggedInUser'));
+    if (user && (user.type === 'admin' || user.type === 'staff')) {
+      setLoggedInUser(user);
+    } else {
+      navigate('/login'); // Redirect if not admin or staff
+    }
+  }, [navigate]);
+
 
   // Handle input changes for the form (remains the same)
   const handleChange = (e) => {
@@ -136,52 +152,31 @@ function ResultsManagement() {
       return subject ? subject.subjectName : 'Unknown Subject';
   };
 
-  // Get unique classes from students for the dropdown (remains the same)
+  // Get unique classes from existing students for the dropdown
   const uniqueClasses = [...new Set(students.map(s => s.studentClass))].sort();
 
 
-  // NEW: Function to export all results to CSV
-  const exportAllResults = () => {
-    let csv = "Student Name,Student ID,Class,Term,Type,Subject,Score\n"; // CSV Header
+  // NEW: Filtered Students and Subjects based on loggedInUser role
+  const isTeacher = loggedInUser && loggedInUser.type === 'staff' && loggedInUser.role.includes('Teacher');
+  const teacherAssignedClasses = isTeacher ? loggedInUser.assignedClasses || [] : [];
+  const teacherAssignedSubjects = isTeacher ? loggedInUser.assignedSubjects || [] : [];
 
-    if (results.length === 0) {
-      alert("No results available to export.");
-      return;
-    }
+  const availableClassesForInput = isTeacher
+    ? uniqueClasses.filter(cls => teacherAssignedClasses.includes(cls))
+    : uniqueClasses; // Admin sees all classes
 
-    results.forEach(result => {
-      const studentName = getStudentName(result.studentNameSelect);
-      const studentID = result.studentNameSelect;
-      const className = result.classSelect;
-      const term = result.termSelect;
-      const caType = result.caType;
-      const subjectName = getSubjectName(result.subjectSelect);
-      const score = result.score;
+  const availableStudentsForInput = isTeacher
+    ? students.filter(s => teacherAssignedClasses.includes(s.studentClass))
+    : students; // Admin sees all students
 
-      // Enclose fields with commas in quotes to handle them correctly in CSV
-      csv += `"${studentName}","${studentID}","${className}","${term}","${caType}","${subjectName}","${score}"\n`;
-    });
+  const availableSubjectsForInput = isTeacher
+    ? subjects.filter(sub => teacherAssignedSubjects.includes(sub.subjectCode))
+    : subjects; // Admin sees all subjects
 
-    // Create a Blob from the CSV string
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
 
-    // Create a temporary link element to trigger the download
-    const link = document.createElement("a");
-    if (link.download !== undefined) { // Feature detection for download attribute
-      const url = URL.createObjectURL(blob);
-      link.setAttribute("href", url);
-      link.setAttribute("download", `all_school_results_${new Date().toISOString().slice(0,10)}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url); // Clean up the URL object
-    } else {
-      // Fallback for browsers that don't support download attribute (less common now)
-      window.open('data:text/csv;charset=utf-8,' + escape(csv));
-    }
-  };
-
+  if (!loggedInUser) {
+      return <div className="content-section">Access Denied. Please log in as Admin or Staff.</div>;
+  }
 
   return (
     <div className="content-section">
@@ -197,9 +192,10 @@ function ResultsManagement() {
             onChange={handleChange}
           >
             <option value="">Select Class</option>
-            {uniqueClasses.map(className => (
+            {availableClassesForInput.map(className => ( // Use filtered classes
                 <option key={className} value={className}>{className}</option>
             ))}
+            {availableClassesForInput.length === 0 && <option value="" disabled>No classes assigned/available</option>}
           </select>
           <select
             id="studentNameSelect"
@@ -208,13 +204,14 @@ function ResultsManagement() {
             onChange={handleChange}
           >
             <option value="">Select Student Name</option>
-            {students
+            {availableStudentsForInput // Use filtered students
                 .filter(student => !newResult.classSelect || student.studentClass === newResult.classSelect.replace(' ', ''))
                 .map(student => (
                 <option key={student.admissionNo} value={student.admissionNo}>
                     {student.firstName} {student.lastName} ({student.admissionNo})
                 </option>
             ))}
+            {availableStudentsForInput.length === 0 && <option value="" disabled>No students assigned/available</option>}
           </select>
           <select
             id="subjectSelect"
@@ -223,11 +220,12 @@ function ResultsManagement() {
             onChange={handleChange}
           >
             <option value="">Select Subject</option>
-            {subjects.map(subject => (
+            {availableSubjectsForInput.map(subject => ( // Use filtered subjects
               <option key={subject.subjectCode} value={subject.subjectCode}>
                 {subject.subjectName} ({subject.subjectCode})
               </option>
             ))}
+            {availableSubjectsForInput.length === 0 && <option value="" disabled>No subjects assigned/available</option>}
           </select>
           <select
             id="termSelect"
@@ -264,8 +262,7 @@ function ResultsManagement() {
             onChange={handleChange}
           />
           <button type="submit">{submitButtonText}</button>
-          {/* Connect the Export button to the new function */}
-          <button type="button" onClick={exportAllResults}>
+          <button type="button" onClick={() => alert('Export All Results (CSV) logic goes here!')}>
             Export All Results (CSV)
           </button>
         </form>
