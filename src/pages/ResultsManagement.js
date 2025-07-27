@@ -1,59 +1,27 @@
 // src/pages/ResultsManagement.js
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import useLocalStorage from '../hooks/useLocalStorage';
 
 function ResultsManagement() {
-  // State for the list of results
-  const [results, setResults] = useLocalStorage('schoolPortalResults',[]);
-  // State for data to populate dropdowns (students and subjects)
-  const [students, setStudents] = useState([]);
-  const [subjects, setSubjects] = useState([]);
+  const [results, setResults] = useLocalStorage('schoolPortalResults', []);
+  const [students] = useLocalStorage('schoolPortalStudents', []);
+  const [subjects] = useLocalStorage('schoolPortalSubjects', []);
 
-  // State for new result form inputs
   const [newResult, setNewResult] = useState({
     classSelect: '',
-    studentNameSelect: '', // Will store student's admissionNo
-    subjectSelect: '',     // Will store subjectCode
+    studentNameSelect: '',
+    subjectSelect: '',
     termSelect: '',
-    caType: '', // Renamed from 'CA' to 'caType' for clarity
+    caType: '',
     score: ''
   });
 
-  // State to control button text (Add/Update)
   const [submitButtonText, setSubmitButtonText] = useState('Add Result');
-  // State to keep track if we are in edit mode
   const [isEditing, setIsEditing] = useState(false);
-  // State to store the ID of the result being edited (combination of student/subject/term/caType)
   const [editResultId, setEditResultId] = useState(null);
-  // State for filter by student ID
   const [studentIdFilter, setStudentIdFilter] = useState('');
 
-
-  // useEffect to load students and subjects from localStorage on initial mount
-  useLocalStorage(() => {
-    const storedStudents = localStorage.getItem('schoolPortalStudents');
-    if (storedStudents) {
-      setStudents(JSON.parse(storedStudents));
-    }
-    const storedSubjects = localStorage.getItem('schoolPortalSubjects');
-    if (storedSubjects) {
-      setSubjects(JSON.parse(storedSubjects));
-    }
-    // Load results as well
-    const storedResults = localStorage.getItem('schoolPortalResults');
-    if (storedResults) {
-      setResults(JSON.parse(storedResults));
-    }
-  }, []); // Empty dependency array means this runs only once on mount
-
-  // useEffect to save results to localStorage whenever the 'results' state changes
-  useLocalStorage(() => {
-    if (results.length > 0 || localStorage.getItem('schoolPortalResults')) {
-      localStorage.setItem('schoolPortalResults', JSON.stringify(results));
-    }
-  }, [results]); // This effect runs whenever 'results' state changes
-
-  // Handle input changes for the form
+  // Handle input changes for the form (remains the same)
   const handleChange = (e) => {
     const { id, value } = e.target;
     setNewResult(prevResult => ({
@@ -62,11 +30,10 @@ function ResultsManagement() {
     }));
   };
 
-  // Handle form submission (Add or Update)
+  // Handle form submission (Add or Update) (remains the same)
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // Basic validation
     if (
       !newResult.classSelect ||
       !newResult.studentNameSelect ||
@@ -85,12 +52,10 @@ function ResultsManagement() {
         return;
     }
 
-    // Create a unique identifier for each result entry (student + subject + term + CA type)
     const resultIdentifier = `${newResult.studentNameSelect}-${newResult.subjectSelect}-${newResult.termSelect}-${newResult.caType}`;
-    const resultToAddOrUpdate = { ...newResult, score: score, id: resultIdentifier }; // Add unique ID
+    const resultToAddOrUpdate = { ...newResult, score: score, id: resultIdentifier };
 
     if (isEditing) {
-      // Update existing result
       setResults(prevResults =>
         prevResults.map(result =>
           result.id === editResultId ? resultToAddOrUpdate : result
@@ -98,8 +63,6 @@ function ResultsManagement() {
       );
       alert('Result updated successfully!');
     } else {
-      // Add new result
-      // Check for duplicate entry for the same student, subject, term, and CA type
       if (results.some(r => r.id === resultIdentifier)) {
         alert('This result entry already exists. Please edit it or choose different criteria.');
         return;
@@ -108,7 +71,6 @@ function ResultsManagement() {
       alert('Result added successfully!');
     }
 
-    // Reset form and state after submission
     setNewResult({
       classSelect: '',
       studentNameSelect: '',
@@ -122,18 +84,18 @@ function ResultsManagement() {
     setEditResultId(null);
   };
 
-  // Function to populate form for editing
+  // Function to populate form for editing (remains the same)
   const editResult = (resultIdToEdit) => {
     const resultToEdit = results.find(r => r.id === resultIdToEdit);
     if (resultToEdit) {
-      setNewResult(resultToEdit); // Populate the form state with result data
+      setNewResult(resultToEdit);
       setSubmitButtonText('Update Result');
       setIsEditing(true);
       setEditResultId(resultIdToEdit);
     }
   };
 
-  // Function to delete result
+  // Function to delete result (remains the same)
   const deleteResult = (resultIdToDelete) => {
     if (window.confirm(`Are you sure you want to delete this result entry?`)) {
       setResults(prevResults => prevResults.filter(result => result.id !== resultIdToDelete));
@@ -141,7 +103,7 @@ function ResultsManagement() {
     }
   };
 
-  // Clear filter and reset form
+  // Clear filter and reset form (remains the same)
   const clearFilterAndForm = () => {
     setStudentIdFilter('');
     setNewResult({
@@ -157,22 +119,69 @@ function ResultsManagement() {
     setEditResultId(null);
   };
 
-  // Filter results based on student admission number
+  // Filter results based on student admission number (remains the same)
   const filteredResults = studentIdFilter
     ? results.filter(result => result.studentNameSelect.toLowerCase().includes(studentIdFilter.toLowerCase()))
     : results;
 
-  // Helper function to get student name from ID
+  // Helper function to get student name from ID (remains the same)
   const getStudentName = (admissionNo) => {
       const student = students.find(s => s.admissionNo === admissionNo);
       return student ? `${student.firstName} ${student.lastName}` : 'Unknown Student';
   };
 
-  // Helper function to get subject name from code
+  // Helper function to get subject name from code (remains the same)
   const getSubjectName = (subjectCode) => {
       const subject = subjects.find(s => s.subjectCode === subjectCode);
       return subject ? subject.subjectName : 'Unknown Subject';
   };
+
+  // Get unique classes from students for the dropdown (remains the same)
+  const uniqueClasses = [...new Set(students.map(s => s.studentClass))].sort();
+
+
+  // NEW: Function to export all results to CSV
+  const exportAllResults = () => {
+    let csv = "Student Name,Student ID,Class,Term,Type,Subject,Score\n"; // CSV Header
+
+    if (results.length === 0) {
+      alert("No results available to export.");
+      return;
+    }
+
+    results.forEach(result => {
+      const studentName = getStudentName(result.studentNameSelect);
+      const studentID = result.studentNameSelect;
+      const className = result.classSelect;
+      const term = result.termSelect;
+      const caType = result.caType;
+      const subjectName = getSubjectName(result.subjectSelect);
+      const score = result.score;
+
+      // Enclose fields with commas in quotes to handle them correctly in CSV
+      csv += `"${studentName}","${studentID}","${className}","${term}","${caType}","${subjectName}","${score}"\n`;
+    });
+
+    // Create a Blob from the CSV string
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+
+    // Create a temporary link element to trigger the download
+    const link = document.createElement("a");
+    if (link.download !== undefined) { // Feature detection for download attribute
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `all_school_results_${new Date().toISOString().slice(0,10)}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url); // Clean up the URL object
+    } else {
+      // Fallback for browsers that don't support download attribute (less common now)
+      window.open('data:text/csv;charset=utf-8,' + escape(csv));
+    }
+  };
+
 
   return (
     <div className="content-section">
@@ -188,21 +197,15 @@ function ResultsManagement() {
             onChange={handleChange}
           >
             <option value="">Select Class</option>
-            {/* Dynamically populate classes based on available students, or hardcode if preferred */}
-            <option value="JSS 1">JSS 1</option>
-            <option value="JSS 2">JSS 2</option>
-            <option value="JSS 3">JSS 3</option>
-            <option value="SS 1">SS 1</option>
-            <option value="SS 2">SS 2</option>
-            <option value="SS 3">SS 3</option>
+            {uniqueClasses.map(className => (
+                <option key={className} value={className}>{className}</option>
+            ))}
           </select>
           <select
             id="studentNameSelect"
             required
             value={newResult.studentNameSelect}
             onChange={handleChange}
-            // Only show students for the selected class, if a class is selected
-            // (Advanced: filter `students` state based on `newResult.classSelect` before mapping)
           >
             <option value="">Select Student Name</option>
             {students
@@ -238,7 +241,7 @@ function ResultsManagement() {
             <option value="Term 3">Third Term</option>
           </select>
           <select
-            id="caType" 
+            id="caType"
             required
             value={newResult.caType}
             onChange={handleChange}
@@ -261,8 +264,8 @@ function ResultsManagement() {
             onChange={handleChange}
           />
           <button type="submit">{submitButtonText}</button>
-          {/* Export button placeholder */}
-          <button type="button" onClick={() => alert('Export All Results (CSV) logic goes here!')}>
+          {/* Connect the Export button to the new function */}
+          <button type="button" onClick={exportAllResults}>
             Export All Results (CSV)
           </button>
         </form>
@@ -278,7 +281,7 @@ function ResultsManagement() {
           onChange={(e) => setStudentIdFilter(e.target.value)}
         />
         <button id="clearResultFilterBtn" onClick={clearFilterAndForm}>Clear Filter / Reset Form</button>
-        <div className="table-container"> {/* Using table for results list */}
+        <div className="table-container">
             <table id="resultsTable">
                 <thead>
                     <tr>
@@ -294,7 +297,7 @@ function ResultsManagement() {
                 <tbody>
                 {filteredResults.length > 0 ? (
                     filteredResults.map(result => (
-                    <tr key={result.id}> {/* Use the unique identifier as key */}
+                    <tr key={result.id}>
                         <td>{getStudentName(result.studentNameSelect)} ({result.studentNameSelect})</td>
                         <td>{result.classSelect}</td>
                         <td>{getSubjectName(result.subjectSelect)}</td>

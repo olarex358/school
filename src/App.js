@@ -1,11 +1,24 @@
 // src/App.js
-import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 import Header from './components/Header';
-import Footer from './components/Footer'; // <--- Ensure this line is present
+import Footer from './components/Footer';
 
-// Import your page components
+// Import all your page components
+import LoginPage from './pages/LoginPage';
+import HomePage from './pages/HomePage'; // Ensure this is imported
+import StudentProfile from './pages/StudentProfile';
+import StudentResults from './pages/StudentResults';
+import StudentSyllabus from './pages/StudentSyllabus';
+import StudentCertification from './pages/StudentCertification';
+import StudentAttendance from './pages/StudentAttendance';
+import StudentSubjects from './pages/StudentSubjects';
+import StudentCalendar from './pages/StudentCalendar';
+import StudentFees from './pages/StudentFees';
+import StudentMails from './pages/StudentMails';
+import StudentPasswordChange from './pages/StudentPasswordChange';
+import StaffProfile from './pages/StaffProfile';
 import Dashboard from './pages/Dashboard';
 import StudentManagement from './pages/StudentManagement';
 import StaffManagement from './pages/StaffManagement';
@@ -14,24 +27,109 @@ import ViewReports from './pages/ViewReports';
 import AcademicManagement from './pages/AcademicManagement';
 import UserPermissionsManagement from './pages/UserPermissionsManagement';
 
+// Import dashboards
+import StudentDashboard from './pages/StudentDashboard';
+import StaffDashboard from './pages/StaffDashboard';
+
+// Import staff-specific pages
+import StaffSubjects from './pages/StaffSubjects';
+import StaffCalendar from './pages/StaffCalendar';
+import StaffMails from './pages/StaffMails';
+import StaffPasswordChange from './pages/StaffPasswordChange';
+
+
+// Helper component for protected routes (no changes needed here)
+const ProtectedRoute = ({ children, allowedTypes }) => {
+  const loggedInUser = JSON.parse(localStorage.getItem('loggedInUser'));
+
+  if (!loggedInUser) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (allowedTypes && !allowedTypes.includes(loggedInUser.type)) {
+    if (loggedInUser.type === 'admin') return <Navigate to="/dashboard" replace />;
+    if (loggedInUser.type === 'student') return <Navigate to="/student-dashboard" replace />;
+    if (loggedInUser.type === 'staff') return <Navigate to="/staff-dashboard" replace />;
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+};
+
+
 function App() {
+  // Initialize loggedInUser state more robustly
+  const [loggedInUser, setLoggedInUser] = useState(() => {
+    try {
+      const user = localStorage.getItem('loggedInUser');
+      return user ? JSON.parse(user) : null;
+    } catch (error) {
+      console.error("Failed to parse loggedInUser from localStorage", error);
+      return null;
+    }
+  });
+
+  // No useEffect needed here for initial load if useState is initialized with a function
+
   return (
     <div className="App">
-      <Header />
+      {/* Main App Header/Footer (only for authenticated routes) */}
+      {loggedInUser && <Header />}
+
       <main style={{ flexGrow: 1, padding: '20px' }}>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/student-management" element={<StudentManagement />} />
-          <Route path="/staff-management" element={<StaffManagement />} />
-          <Route path="/results-management" element={<ResultsManagement />} />
-          <Route path="/view-reports" element={<ViewReports />} />
-          <Route path="/academic-management" element={<AcademicManagement />} />
-          <Route path="/user-permissions-management" element={<UserPermissionsManagement />} />
+          {/* Public Routes */}
+          <Route path="/login" element={<LoginPage />} />
+          {/* Explicit route for Home, also serves as a fallback */}
+          <Route path="/home" element={<HomePage />} />
+
+          {/* Default / route: Redirects to appropriate dashboard if logged in, otherwise to HomePage */}
+          <Route path="/" element={
+            loggedInUser ? (
+              loggedInUser.type === 'admin' ? <Navigate to="/dashboard" replace /> :
+              loggedInUser.type === 'student' ? <Navigate to="/student-dashboard" replace /> :
+              loggedInUser.type === 'staff' ? <Navigate to="/staff-dashboard" replace /> :
+              <Navigate to="/login" replace /> // Fallback for unknown type or corrupted data
+            ) : (
+              <HomePage /> // If NOT logged in, render HomePage
+            )
+          } />
+
+          {/* Admin Protected Routes */}
+          <Route path="/dashboard" element={<ProtectedRoute allowedTypes={['admin']}><Dashboard /></ProtectedRoute>} />
+          <Route path="/student-management" element={<ProtectedRoute allowedTypes={['admin']}><StudentManagement /></ProtectedRoute>} />
+          <Route path="/staff-management" element={<ProtectedRoute allowedTypes={['admin']}><StaffManagement /></ProtectedRoute>} />
+          <Route path="/results-management" element={<ProtectedRoute allowedTypes={['admin']}><ResultsManagement /></ProtectedRoute>} />
+          <Route path="/view-reports" element={<ProtectedRoute allowedTypes={['admin']}><ViewReports /></ProtectedRoute>} />
+          <Route path="/academic-management" element={<ProtectedRoute allowedTypes={['admin']}><AcademicManagement /></ProtectedRoute>} />
+          <Route path="/user-permissions-management" element={<ProtectedRoute allowedTypes={['admin']}><UserPermissionsManagement /></ProtectedRoute>} />
+
+          {/* Student Protected Routes */}
+          <Route path="/student-dashboard" element={<ProtectedRoute allowedTypes={['student']}><StudentDashboard /></ProtectedRoute>} />
+          <Route path="/student-profile" element={<ProtectedRoute allowedTypes={['student']}><StudentProfile /></ProtectedRoute>} />
+          <Route path='/student-results' element={<ProtectedRoute allowedTypes={['student']}><StudentResults /></ProtectedRoute>} />
+          <Route path='/student-syllabus' element={<ProtectedRoute allowedTypes={['student']}><StudentSyllabus /></ProtectedRoute>} />
+          <Route path='/student-certification' element={<ProtectedRoute allowedTypes={['student']}><StudentCertification /></ProtectedRoute>} />
+          <Route path='/student-attendance' element={<ProtectedRoute allowedTypes={['student']}><StudentAttendance /></ProtectedRoute>} />
+          <Route path='/student-subjects' element={<ProtectedRoute allowedTypes={['student']}><StudentSubjects /></ProtectedRoute>} />
+          <Route path='/student-calendar' element={<ProtectedRoute allowedTypes={['student']}><StudentCalendar /></ProtectedRoute>} />
+          <Route path='/student-fees' element={<ProtectedRoute allowedTypes={['student']}><StudentFees /></ProtectedRoute>} />
+          <Route path='/student-mails' element={<ProtectedRoute allowedTypes={['student']}><StudentMails /></ProtectedRoute>} />
+          <Route path='/student-password-change' element={<ProtectedRoute allowedTypes={['student']}><StudentPasswordChange /></ProtectedRoute>} />
+
+          {/* Staff Protected Routes */}
+          <Route path="/staff-dashboard" element={<ProtectedRoute allowedTypes={['staff']}><StaffDashboard /></ProtectedRoute>} />
+          <Route path="/staff-profile" element={<ProtectedRoute allowedTypes={['staff']}><StaffProfile /></ProtectedRoute>} />
+          <Route path="/staff-subjects" element={<ProtectedRoute allowedTypes={['staff']}><StaffSubjects /></ProtectedRoute>} />
+          <Route path="/staff-calendar" element={<ProtectedRoute allowedTypes={['staff']}><StaffCalendar /></ProtectedRoute>} />
+          <Route path="/staff-mails" element={<ProtectedRoute allowedTypes={['staff']}><StaffMails /></ProtectedRoute>} />
+          <Route path="/staff-password-change" element={<ProtectedRoute allowedTypes={['staff']}><StaffPasswordChange /></ProtectedRoute>} />
+
+          {/* Catch-all route for 404 pages */}
           <Route path="*" element={<h2>404 - Page Not Found</h2>} />
         </Routes>
       </main>
-      <Footer /> {/* <--- Ensure this line is present */}
+      {loggedInUser && <Footer />}
     </div>
   );
 }
