@@ -2,19 +2,22 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 
-// Import icons for cards (ensure these paths are correct relative to src/pages/)
+// Import icons
 import studentIcon from '../icon/profile.png';
-import resultsInputIcon from '../icon/attendance.png'; // Using attendance icon for input results
+import resultsInputIcon from '../icon/attendance.png';
 import academicIcon from '../icon/subject.png';
 import masterResultIcon from '../icon/result.png';
 import staffIcon from '../icon/password.png';
 import permissionsIcon from '../icon/settings.png';
 import mailsIcon from '../icon/mails.png';
+import feesIcon from '../icon/fees.png';
+import calendarIcon from '../icon/calender.png';
+import syllabusIcon from '../icon/sylabus.png'; // NEW: Import syllabus icon
 
 
 function Dashboard() {
   const navigate = useNavigate();
-  const [adminInfo, setAdminInfo] = useState(null); // State to hold logged-in admin info
+  const [adminInfo, setAdminInfo] = useState(null);
 
   // States to hold counts
   const [studentCount, setStudentCount] = useState(0);
@@ -22,16 +25,18 @@ function Dashboard() {
   const [subjectCount, setSubjectCount] = useState(0);
   const [resultEntryCount, setResultEntryCount] = useState(0);
   const [userCount, setUserCount] = useState(0);
+  const [feeRecordCount, setFeeRecordCount] = useState(0);
+  const [calendarEventCount, setCalendarEventCount] = useState(0);
+  const [syllabusEntryCount, setSyllabusEntryCount] = useState(0); // NEW: Syllabus Entry Count
 
   useEffect(() => {
     const loggedInUser = JSON.parse(localStorage.getItem('loggedInUser'));
     if (loggedInUser && loggedInUser.type === 'admin') {
-        setAdminInfo(loggedInUser); // Set admin info
+        setAdminInfo(loggedInUser);
     } else {
-        navigate('/login'); // Redirect if not logged in as admin
+        navigate('/login');
     }
 
-    // Load counts from localStorage
     const storedStudents = localStorage.getItem('schoolPortalStudents');
     if (storedStudents) {
       setStudentCount(JSON.parse(storedStudents).length);
@@ -52,16 +57,28 @@ function Dashboard() {
     if (storedUsers) {
       setUserCount(JSON.parse(storedUsers).length);
     }
+    const storedFeeRecords = localStorage.getItem('schoolPortalFeeRecords');
+    if (storedFeeRecords) {
+        setFeeRecordCount(JSON.parse(storedFeeRecords).length);
+    }
+    const storedCalendarEvents = localStorage.getItem('schoolPortalCalendarEvents');
+    if (storedCalendarEvents) {
+        setCalendarEventCount(JSON.parse(storedCalendarEvents).length);
+    }
+    // NEW: Load syllabus entry count
+    const storedSyllabusEntries = localStorage.getItem('schoolPortalSyllabusEntries');
+    if (storedSyllabusEntries) {
+        setSyllabusEntryCount(JSON.parse(storedSyllabusEntries).length);
+    }
   }, [navigate]);
 
   const handleCardClick = (path) => {
     navigate(path);
   };
 
-  // LOGOUT FUNCTIONALITY
   const handleLogout = () => {
-    localStorage.removeItem('loggedInUser'); // Clear login state
-    navigate('/login'); // Redirect to login page
+    localStorage.removeItem('loggedInUser');
+    navigate('/home');
   };
 
   if (!adminInfo) {
@@ -73,7 +90,7 @@ function Dashboard() {
         <aside className="sidebar">
             <h2>Busari-alao College</h2>
             <ul>
-                {/* Admin sidebar navigation links */}
+                {/* Admin sidebar links */}
                 <li><Link to="/dashboard">Dashboard</Link></li>
                 <li><Link to="/student-management">Student Management</Link></li>
                 <li><Link to="/staff-management">Staff Management</Link></li>
@@ -82,10 +99,12 @@ function Dashboard() {
                 <li><Link to="/academic-management">Academic Management</Link></li>
                 <li><Link to="/user-permissions-management">User/Permissions Management</Link></li>
                 <li><Link to="/admin-messaging">Admin Messaging</Link></li>
+                <li><Link to="/admin-fees-management">Fee Management</Link></li>
+                <li><Link to="/admin-calendar-management">Calendar Management</Link></li>
+                <li><Link to="/admin-syllabus-management">Syllabus Management</Link></li> {/* NEW ADMIN SIDEBAR LINK */}
             </ul>
-            <button type="button" id="logoutBtn" onClick={handleLogout}>Logout</button> {/* LOGOUT BUTTON */}
-        
-            </aside>
+            <button type="button" id="logoutBtn" onClick={handleLogout}>Logout</button>
+        </aside>
 
         <div className="main-content">
             <h1>Admin Portal Dashboard</h1>
@@ -119,9 +138,21 @@ function Dashboard() {
                 </div>
                 <div className="card" onClick={() => handleCardClick('/admin-messaging')}>
                   <img src={mailsIcon} alt="Admin Messaging" width="50px" height="50px" />
-                  Mail Management
+                  Admin Messaging
                 </div>
-                
+                <div className="card" onClick={() => handleCardClick('/admin-fees-management')}>
+                  <img src={feesIcon} alt="Fee Management" width="50px" height="50px" />
+                  Fee Management ({feeRecordCount})
+                </div>
+                <div className="card" onClick={() => handleCardClick('/admin-calendar-management')}>
+                  <img src={calendarIcon} alt="Calendar Management" width="50px" height="50px" />
+                  Calendar Management ({calendarEventCount})
+                </div>
+                {/* NEW ADMIN DASHBOARD CARD */}
+                <div className="card" onClick={() => handleCardClick('/admin-syllabus-management')}>
+                  <img src={syllabusIcon} alt="Syllabus Management" width="50px" height="50px" />
+                  Syllabus Management ({syllabusEntryCount})
+                </div>
             </div>
         </div>
     </div>

@@ -1,45 +1,274 @@
 /* src/components/Header.module.css */
+
 .header {
-    background-color: #282c34;
-    padding: 15px 20px;
+    background-color: var(--primary-blue);
+    /* Confirmed: Same as footer (from App.css :root) */
     color: white;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-}
-
-.header nav {
+    padding: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
     align-items: center;
-    max-width: 1200px;
-    margin: 0 auto;
+    width: 100%;
 }
 
-.logo {
-    /* No need for .header prefix here as CSS Modules localizes it */
-    font-size: 1.8em;
+/* Top Bar for User Info / Logout */
+.topBar {
+    width: 100%;
+    background-color: rgba(0, 0, 0, 0.);
+    /* Slightly transparent dark bar */
+    padding: 8px 25px;
+    /* Increased horizontal padding */
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    font-size: 0.95em;
+    /* Slightly larger text */
+    color: rgba(255, 255, 255, 0.9);
+    box-sizing: border-box;
+}
+
+.welcomeText {
+    margin-right: auto;
     font-weight: bold;
-    color: #61dafb;
+}
+
+/* Main Logo and Slogan Area */
+.mainHeaderContent {
+    padding: 25px 0;
+    /* Increased vertical padding */
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-grow: 1;
+    min-height: 150px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.headerLogo {
+    width: 80px;
+    height: auto;
+    margin-bottom: 12px;
+    /* Adjusted spacing */
+    filter: drop-shadow(0px 2px 3px rgba(0, 0, 0, 0.2));
+    /* Subtle shadow for logo */
+}
+
+.collegeName {
+    font-size: 2.3em;
+    /* Slightly larger font for name */
+    font-weight: 700;
+    /* Bolder font weight */
+    margin: 0;
+    color: white;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+    /* Subtle text shadow */
+}
+
+.slogan {
+    font-size: 1.15em;
+    /* Slightly larger slogan */
+    margin-top: 6px;
+    /* Adjusted spacing */
+    color: rgba(255, 255, 255, 0.95);
+    /* Brighter slogan */
+}
+
+
+/* Main Navigation Bar (below the main content) */
+.mainNav {
+    width: 100%;
+    background-color: rgba(0, 0, 0, 0.2);
+    /* Slightly darker transparent bar */
+    padding: 12px 20px;
+    /* Increased vertical padding */
+    box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.05);
+    box-sizing: border-box;
 }
 
 .nav-links {
-    /* No need for .header prefix here as CSS Modules localizes it */
     list-style: none;
     margin: 0;
     padding: 0;
     display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 30px;
+    /* Increased space between links */
 }
 
 .nav-links li {
-    margin-left: 25px;
+    margin: 0;
 }
 
 .nav-links a {
     color: white;
     text-decoration: none;
     font-weight: 500;
-    transition: color 0.3s ease;
+    padding: 10px 15px;
+    /* NEW: Increased padding for a larger click area */
+    border-radius: 8px;
+    /* NEW: More rounded corners */
+    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+    /* Added box-shadow transition */
+    font-size: 1.05em;
+    /* NEW: Slightly larger font size for links */
+    display: flex;
+    /* Allow content inside to center */
+    align-items: center;
+    /* Center text vertically */
+    justify-content: center;
+    /* Center text horizontally */
 }
 
 .nav-links a:hover {
-    color: #61dafb;
+    background-color: rgba(255, 255, 255, 0.3);
+    /* More prominent hover background */
+    transform: translateY(-2px);
+    /* Stronger lift effect */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    /* Subtle shadow on hover */
+}
+
+/* Active link styling */
+.activeLink {
+    color: #ffffff;
+    font-weight: bold;
+    background-color: rgba(255, 255, 255, 0.4);
+    /* Darker background for active */
+    border-bottom: 3px solid white;
+    /* Thicker, solid white underline */
+    padding-bottom: 7px;
+    /* Space for the underline */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    /* Subtle shadow for active state */
+}
+
+.activeLink:hover {
+    background-color: rgba(255, 255, 255, 0.5);
+    /* Even darker hover for active */
+}
+
+/* Logout button in header */
+.logoutButton {
+    background-color: var(--error-color);
+    color: var(--text-color-light);
+    border: none;
+    padding: 7px 14px;
+    /* Adjusted padding */
+    border-radius: 5px;
+    /* Consistent rounding */
+    cursor: pointer;
+    font-size: 0.9em;
+    margin-left: 15px;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.logoutButton:hover {
+    background-color: #bb2d3b;
+    transform: scale(1.05);
+}
+
+
+/* Responsive adjustments for Header */
+@media (max-width: 768px) {
+    .header {
+        padding: 0;
+    }
+
+    .topBar {
+        padding: 6px 15px;
+        font-size: 0.85em;
+    }
+
+    .mainHeaderContent {
+        min-height: 100px;
+        /* Reduced min height for smaller screens */
+        padding: 15px 0;
+    }
+
+    .headerLogo {
+        width: 70px;
+        /* Adjusted */
+    }
+
+    .collegeName {
+        font-size: 1.9em;
+        /* Adjusted */
+    }
+
+    .slogan {
+        font-size: 1em;
+        /* Adjusted */
+    }
+
+    .mainNav {
+        padding: 10px 15px;
+        /* Adjusted */
+    }
+
+    .nav-links {
+        gap: 15px;
+        /* Adjusted */
+    }
+
+    .nav-links a {
+        padding: 8px 12px;
+        /* Adjusted */
+        font-size: 0.95em;
+        /* Adjusted */
+    }
+
+    .logoutButton {
+        padding: 5px 10px;
+        font-size: 0.8em;
+    }
+}
+
+@media (max-width: 480px) {
+    .mainHeaderContent {
+        min-height: 80px;
+        /* Further reduced */
+    }
+
+    .headerLogo {
+        width: 50px;
+        /* Adjusted */
+        margin-bottom: 8px;
+    }
+
+    .collegeName {
+        font-size: 1.5em;
+        /* Adjusted */
+    }
+
+    .slogan {
+        font-size: 0.8em;
+        /* Adjusted */
+    }
+
+    .nav-links {
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .nav-links li {
+        width: 100%;
+        text-align: center;
+    }
+
+    .nav-links a {
+        display: block;
+        width: 100%;
+        padding: 6px 0;
+        /* Adjusted vertical padding */
+    }
+
+    .topBar {
+        padding: 5px 10px;
+    }
 }

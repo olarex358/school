@@ -169,6 +169,7 @@ function UserPermissionsManagement() {
             <option value="Staff Manager">Staff Manager</option>
             <option value="Results Manager">Results Manager</option>
             <option value="Academic Manager">Academic Manager</option>
+             <option value="Fee Manager">Fee Manager</option>
             <option value="View Reports">View Reports Only</option>
           </select>
           <button type="submit">{submitButtonText}</button>

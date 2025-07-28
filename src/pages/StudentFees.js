@@ -21,7 +21,7 @@ function StudentFees() {
 
   const handleLogout = () => {
     localStorage.removeItem('loggedInUser');
-    navigate('/login');
+    navigate('/home');
   };
 
   if (!loggedInStudent) {

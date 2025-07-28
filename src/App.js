@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
-// Import Header and Footer - these will now be for authenticated sections only
+// Import Header and Footer - these will now be general for all pages
 import Header from './components/Header';
 import Footer from './components/Footer';
 
@@ -40,6 +40,13 @@ import StaffPasswordChange from './pages/StaffPasswordChange';
 
 // Import Admin Messaging
 import AdminMessaging from './pages/AdminMessaging';
+
+// Import AdminFeesManagement
+import AdminFeesManagement from './pages/AdminFeesManagement';
+
+// Import Admin Calendar and Syllabus Management
+import AdminCalendarManagement from './pages/AdminCalendarManagement';
+import AdminSyllabusManagement from './pages/AdminSyllabusManagement';
 
 
 // Helper component for protected routes
@@ -92,14 +99,23 @@ function App() {
 
   return (
     <div className="App">
-      {/* Main App Header/Footer (only for authenticated routes) */}
-      {loggedInUser && <Header />}
+      <Header /> {/* Always render Header */}
 
       <main style={{ flexGrow: 1, padding: '20px' }}>
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/home" element={<HomePage />} />
+          <Route path="/home" element={
+            // If logged in and at /home, redirect to dashboard. Otherwise show HomePage.
+            loggedInUser ? (
+                loggedInUser.type === 'admin' ? <Navigate to="/dashboard" replace /> :
+                loggedInUser.type === 'student' ? <Navigate to="/student-dashboard" replace /> :
+                loggedInUser.type === 'staff' ? <Navigate to="/staff-dashboard" replace /> :
+                <HomePage /> // Fallback if type is unknown but logged in
+            ) : (
+                <HomePage /> // If not logged in, show HomePage
+            )
+          } />
 
           {/* Default / route: Redirects to appropriate dashboard if logged in, otherwise to HomePage */}
           <Route path="/" element={
@@ -122,6 +138,9 @@ function App() {
           <Route path="/academic-management" element={<ProtectedRoute allowedTypes={['admin']}><AcademicManagement /></ProtectedRoute>} />
           <Route path="/user-permissions-management" element={<ProtectedRoute allowedTypes={['admin']}><UserPermissionsManagement /></ProtectedRoute>} />
           <Route path="/admin-messaging" element={<ProtectedRoute allowedTypes={['admin']}><AdminMessaging /></ProtectedRoute>} />
+          <Route path="/admin-fees-management" element={<ProtectedRoute allowedTypes={['admin']}><AdminFeesManagement /></ProtectedRoute>} />
+          <Route path="/admin-calendar-management" element={<ProtectedRoute allowedTypes={['admin']}><AdminCalendarManagement /></ProtectedRoute>} />
+          <Route path="/admin-syllabus-management" element={<ProtectedRoute allowedTypes={['admin']}><AdminSyllabusManagement /></ProtectedRoute>} />
 
           {/* Student Protected Routes */}
           <Route path="/student-dashboard" element={<ProtectedRoute allowedTypes={['student']}><StudentDashboard /></ProtectedRoute>} />
@@ -130,7 +149,7 @@ function App() {
           <Route path='/student-syllabus' element={<ProtectedRoute allowedTypes={['student']}><StudentSyllabus /></ProtectedRoute>} />
           <Route path='/student-certification' element={<ProtectedRoute allowedTypes={['student']}><StudentCertification /></ProtectedRoute>} />
           <Route path='/student-attendance' element={<ProtectedRoute allowedTypes={['student']}><StudentAttendance /></ProtectedRoute>} />
-          <Route path='/student-subjects' element={<ProtectedRoute allowedTypes={['student']}><StudentSubjects /></ProtectedRoute>} /> {/* Corrected route path */}
+          <Route path='/student-subjects' element={<ProtectedRoute allowedTypes={['student']}><StudentSubjects /></ProtectedRoute>} />
           <Route path='/student-calendar' element={<ProtectedRoute allowedTypes={['student']}><StudentCalendar /></ProtectedRoute>} />
           <Route path='/student-fees' element={<ProtectedRoute allowedTypes={['student']}><StudentFees /></ProtectedRoute>} />
           <Route path='/student-mails' element={<ProtectedRoute allowedTypes={['student']}><StudentMails /></ProtectedRoute>} />
@@ -148,7 +167,7 @@ function App() {
           <Route path="*" element={<h2>404 - Page Not Found</h2>} />
         </Routes>
       </main>
-      {loggedInUser && <Footer />}
+      <Footer /> {/* Always render Footer */}
     </div>
   );
 }

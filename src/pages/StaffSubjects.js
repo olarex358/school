@@ -18,7 +18,7 @@ function StaffSubjects() {
     if (user && user.type === 'staff') {
       setLoggedInStaff(user);
     } else {
-      navigate('/login'); // Redirect if not logged in as staff
+      navigate('/home'); // Redirect if not logged in as staff
     }
   }, [navigate]);
 

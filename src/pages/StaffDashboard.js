@@ -27,7 +27,7 @@ function StaffDashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem('loggedInUser');
-    navigate('/login');
+    navigate('/home');
   };
 
   const handleCardClick = (path) => {

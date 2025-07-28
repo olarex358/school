@@ -23,7 +23,7 @@ function StudentMails() {
 
   const handleLogout = () => {
     localStorage.removeItem('loggedInUser');
-    navigate('/login');
+    navigate('/home');
   };
 
   if (!loggedInStudent) {

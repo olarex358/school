@@ -15,7 +15,7 @@ function StudentAttendance() {
     if (user && user.type === 'student') {
       setLoggedInStudent(user);
     } else {
-      navigate('/login'); // Redirect if not logged in as a student
+      navigate('/home'); // Redirect if not logged in as a student
     }
   }, [navigate]);
 

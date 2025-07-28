@@ -23,13 +23,13 @@ function StudentDashboard() {
       setStudentInfo(loggedInUser);
     } else {
       // If for some reason not a student or not logged in, redirect to login
-      navigate('/login');
+      navigate('/home');
     }
   }, [navigate]);
 
   const handleLogout = () => {
     localStorage.removeItem('loggedInUser');
-    navigate('/login');
+    navigate('/home');
   };
 
   if (!studentInfo) {
