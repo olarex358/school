@@ -43,39 +43,20 @@
     align-items: center;
     justify-content: center;
     flex-grow: 1;
-    min-height: 150px;
+    min-height: 50px;
     width: 100%;
     box-sizing: border-box;
 }
 
 .headerLogo {
-    width: 80px;
+    width: 130px;
     height: auto;
-    margin-bottom: 12px;
+    margin-bottom: 5px;
     /* Adjusted spacing */
     filter: drop-shadow(0px 2px 3px rgba(0, 0, 0, 0.2));
     /* Subtle shadow for logo */
 }
 
-.collegeName {
-    font-size: 2.3em;
-    /* Slightly larger font for name */
-    font-weight: 700;
-    /* Bolder font weight */
-    margin: 0;
-    color: white;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
-    /* Subtle text shadow */
-}
-
-.slogan {
-    font-size: 1.15em;
-    /* Slightly larger slogan */
-    margin-top: 6px;
-    /* Adjusted spacing */
-    color: rgba(255, 255, 255, 0.95);
-    /* Brighter slogan */
-}
 
 
 /* Main Navigation Bar (below the main content) */
@@ -105,7 +86,7 @@
 }
 
 .nav-links a {
-    color: white;
+    color: black;
     text-decoration: none;
     font-weight: 500;
     padding: 10px 15px;
@@ -135,7 +116,7 @@
 
 /* Active link styling */
 .activeLink {
-    color: #ffffff;
+    color: gray;
     font-weight: bold;
     background-color: rgba(255, 255, 255, 0.4);
     /* Darker background for active */

@@ -84,8 +84,7 @@ function Header() {
       {/* Main Logo and Slogan Area - matches image_73e18b.png */}
       <div className={styles.mainHeaderContent}>
         <img src={logo} alt="Busarialao College Logo" className={styles.headerLogo} />
-        <h1 className={styles.collegeName}>Busarialao College</h1>
-        <p className={styles.slogan}>...educating to inspire</p>
+      
       </div>
 
       {/* Main Navigation - always present, content changes based on login */}

@@ -47,6 +47,7 @@ import AdminFeesManagement from './pages/AdminFeesManagement';
 // Import Admin Calendar and Syllabus Management
 import AdminCalendarManagement from './pages/AdminCalendarManagement';
 import AdminSyllabusManagement from './pages/AdminSyllabusManagement';
+import MarkAttendance from './pages/MarkAttendance'
 
 
 // Helper component for protected routes
@@ -156,12 +157,14 @@ function App() {
           <Route path='/student-password-change' element={<ProtectedRoute allowedTypes={['student']}><StudentPasswordChange /></ProtectedRoute>} />
 
           {/* Staff Protected Routes */}
-          <Route path="/staff-dashboard" element={<ProtectedRoute allowedTypes={['staff']}><StaffDashboard /></ProtectedRoute>} />
+          <Route path="/staff-dashboard" element={<ProtectedRoute allowedTypes={['staff']}><StaffDashboard/></ProtectedRoute>} />
           <Route path="/staff-profile" element={<ProtectedRoute allowedTypes={['staff']}><StaffProfile /></ProtectedRoute>} />
           <Route path="/staff-subjects" element={<ProtectedRoute allowedTypes={['staff']}><StaffSubjects /></ProtectedRoute>} />
           <Route path="/staff-calendar" element={<ProtectedRoute allowedTypes={['staff']}><StaffCalendar /></ProtectedRoute>} />
           <Route path="/staff-mails" element={<ProtectedRoute allowedTypes={['staff']}><StaffMails /></ProtectedRoute>} />
           <Route path="/staff-password-change" element={<ProtectedRoute allowedTypes={['staff']}><StaffPasswordChange /></ProtectedRoute>} />
+          <Route path="/mark-attendance" element={<ProtectedRoute allowedTypes={['staff']}><MarkAttendance/></ProtectedRoute>} />
+
 
           {/* Catch-all route for 404 pages */}
           <Route path="*" element={<h2>404 - Page Not Found</h2>} />

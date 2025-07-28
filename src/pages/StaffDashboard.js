@@ -10,7 +10,7 @@ import subjectIcon from '../icon/subject.png';
 import calendarIcon from '../icon/calender.png'; // Corrected spelling to match file name
 import mailsIcon from '../icon/mails.png';
 import passwordIcon from '../icon/password.png';
-
+import attendanceIcon from '../icon/attendance.png';
 
 function StaffDashboard() {
   const [staffInfo, setStaffInfo] = useState(null);
@@ -52,10 +52,12 @@ function StaffDashboard() {
                 {staffInfo.role && (staffInfo.role.includes('Teacher') || staffInfo.role.includes('View Reports')) && (
                     <li><Link to="/view-reports">View Reports</Link></li>
                 )}
+                {staffInfo.role && staffInfo.role.includes('Teacher')&&(<li><Link to="/mark-attendance">Mark Attendance</Link></li>)}
                 {/* Staff-specific sidebar links */}
                 <li><Link to="/staff-subjects">My Subjects</Link></li>
                 <li><Link to="/staff-calendar">School Calendar</Link></li>
                 <li><Link to="/staff-mails">Internal Mails</Link></li>
+                <li><Link to="/mark-attendance">Mark Attendance</Link></li>
                 <li><Link to="/staff-password-change">Change Password</Link></li>
             </ul>
             <button type="button" onClick={handleLogout}>Logout</button>
@@ -76,7 +78,7 @@ function StaffDashboard() {
                 {/* Conditional access cards */}
                 {staffInfo.role && (staffInfo.role.includes('Teacher') || staffInfo.role.includes('Results Manager')) && (
                     <div className="card" onClick={() => handleCardClick('/results-management')}>
-                        <img src={resultsInputIcon} alt="Input Results" width="50px" height="50px" />
+                        <img src={resultsInputIcon} alt="Input Results" width="50px" height="50px"/>
                         Input Results
                     </div>
                 )}
@@ -85,6 +87,11 @@ function StaffDashboard() {
                         <img src={viewReportsIcon} alt="View Reports" width="50px" height="50px" />
                         View Reports
                     </div>
+                )}
+                {staffInfo.role && staffInfo.role.includes('Teacher')&&(
+                    <div className='card'onClick={()=>handleCardClick('/mark-attendance')}>
+                        <img src={attendanceIcon} alt='Mark attendance' width='50px' height='50px'/> Mark Attendance
+                </div>
                 )}
                 {/* General staff cards */}
                 <div className="card" onClick={() => handleCardClick('/staff-subjects')}>
