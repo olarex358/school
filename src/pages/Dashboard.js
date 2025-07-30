@@ -12,7 +12,10 @@ import permissionsIcon from '../icon/settings.png';
 import mailsIcon from '../icon/mails.png';
 import feesIcon from '../icon/fees.png';
 import calendarIcon from '../icon/calender.png';
-import syllabusIcon from '../icon/sylabus.png'; // NEW: Import syllabus icon
+import syllabusIcon from '../icon/sylabus.png'; 
+import pendingResultsIcon from '../icon/warning.png'
+import useLocalStorage from '../hooks/useLocalStorage';
+// NEW: Import syllabus icon
 
 
 function Dashboard() {
@@ -27,7 +30,10 @@ function Dashboard() {
   const [userCount, setUserCount] = useState(0);
   const [feeRecordCount, setFeeRecordCount] = useState(0);
   const [calendarEventCount, setCalendarEventCount] = useState(0);
-  const [syllabusEntryCount, setSyllabusEntryCount] = useState(0); // NEW: Syllabus Entry Count
+  const [syllabusEntryCount, setSyllabusEntryCount] = useState(0);
+  const [pendingResultsCount,setPendingResultCount] =useState(0);
+  const [pendingResults]=useLocalStorage('schoolPortalPendingResults',[]);
+  // NEW: Syllabus Entry Count
 
   useEffect(() => {
     const loggedInUser = JSON.parse(localStorage.getItem('loggedInUser'));
@@ -70,7 +76,8 @@ function Dashboard() {
     if (storedSyllabusEntries) {
         setSyllabusEntryCount(JSON.parse(storedSyllabusEntries).length);
     }
-  }, [navigate]);
+  }, [navigate,pendingResults]);
+  
 
   const handleCardClick = (path) => {
     navigate(path);
@@ -95,6 +102,8 @@ function Dashboard() {
                 <li><Link to="/student-management">Student Management</Link></li>
                 <li><Link to="/staff-management">Staff Management</Link></li>
                 <li><Link to="/results-management">Results Management</Link></li>
+                <li><Link to="/admin-results-approval">Results Approval({pendingResultsCount})</Link></li>
+                
                 <li><Link to="/view-reports">View Reports</Link></li>
                 <li><Link to="/academic-management">Academic Management</Link></li>
                 <li><Link to="/user-permissions-management">User/Permissions Management</Link></li>
@@ -116,9 +125,9 @@ function Dashboard() {
                   <img src={studentIcon} alt="Register Students" width="50px" height="50px" />
                   Register Students ({studentCount})
                 </div>
-                <div className="card" onClick={() => handleCardClick('/results-management')}>
-                  <img src={resultsInputIcon} alt="Input Result" width="50px" height="50px" />
-                  Input Results ({resultEntryCount})
+                <div className="card" onClick={() => handleCardClick('/admin-results-approval')}>
+                  <img src={pendingResultsIcon} alt="Result Approval" width="50px" height="50px" />
+                  Results Approval ({pendingResultsCount})
                 </div>
                 <div className="card" onClick={() => handleCardClick('/academic-management')}>
                   <img src={academicIcon} alt="Academic Management" width="50px" height="50px" />

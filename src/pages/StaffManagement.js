@@ -466,8 +466,7 @@ function StaffManagement() {
           id="staffSearchFilter"
           placeholder="Search by Name, ID or Role"
           value={searchTerm}
-          onChange={handleSearchChange}
-        />
+          onChange={handleSearchChange}/>
         <button onClick={clearSearchAndForm}>Clear Filter / Reset Form</button>
         <div className="table-container">
             <table id="staffTable">

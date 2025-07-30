@@ -48,13 +48,16 @@ import AdminFeesManagement from './pages/AdminFeesManagement';
 import AdminCalendarManagement from './pages/AdminCalendarManagement';
 import AdminSyllabusManagement from './pages/AdminSyllabusManagement';
 import MarkAttendance from './pages/MarkAttendance'
+import AdminResultsApproval from './pages/AdminResultsApproval';
 
 
 // Helper component for protected routes
 const ProtectedRoute = ({ children, allowedTypes }) => {
   const loggedInUser = JSON.parse(localStorage.getItem('loggedInUser'));
-
-  if (!loggedInUser) {
+ console.log('ProtectedRoute check:');
+ console.log('loggedInUser:',loggedInUser);
+ console.log('allowedTypes:',allowedTypes);
+  if (!loggedInUser) { console.log('->Not loggedin,redirecting to /login');
     return <Navigate to="/login" replace />;
   }
 
@@ -64,12 +67,13 @@ const ProtectedRoute = ({ children, allowedTypes }) => {
       return <Navigate to="/login" replace />; // Or redirect to a generic error page
   }
 
-  if (allowedTypes && !allowedTypes.includes(loggedInUser.type)) {
+  if (allowedTypes && !allowedTypes.includes(loggedInUser.type)) 
+    { console.log('-> User type not allowed,redirectig based on type');
     if (loggedInUser.type === 'admin') return <Navigate to="/dashboard" replace />;
     if (loggedInUser.type === 'student') return <Navigate to="/student-dashboard" replace />;
     if (loggedInUser.type === 'staff') return <Navigate to="/staff-dashboard" replace />;
     return <Navigate to="/login" replace />; // Fallback
-  }
+  }console.log('->Access granted');
 
   return children;
 };
@@ -134,14 +138,16 @@ function App() {
           <Route path="/dashboard" element={<ProtectedRoute allowedTypes={['admin']}><Dashboard /></ProtectedRoute>} />
           <Route path="/student-management" element={<ProtectedRoute allowedTypes={['admin']}><StudentManagement /></ProtectedRoute>} />
           <Route path="/staff-management" element={<ProtectedRoute allowedTypes={['admin']}><StaffManagement /></ProtectedRoute>} />
-          <Route path="/results-management" element={<ProtectedRoute allowedTypes={['admin']}><ResultsManagement /></ProtectedRoute>} />
-          <Route path="/view-reports" element={<ProtectedRoute allowedTypes={['admin']}><ViewReports /></ProtectedRoute>} />
-          <Route path="/academic-management" element={<ProtectedRoute allowedTypes={['admin']}><AcademicManagement /></ProtectedRoute>} />
+
+<Route path="/results-management" element={<ProtectedRoute allowedTypes={['admin', 'staff']}><ResultsManagement /></ProtectedRoute>} />
+<Route path="/view-reports" element={<ProtectedRoute allowedTypes={['admin', 'staff']}><ViewReports /></ProtectedRoute>} /><Route path="/academic-management" element={<ProtectedRoute allowedTypes={['admin']}><AcademicManagement /></ProtectedRoute>} />
           <Route path="/user-permissions-management" element={<ProtectedRoute allowedTypes={['admin']}><UserPermissionsManagement /></ProtectedRoute>} />
           <Route path="/admin-messaging" element={<ProtectedRoute allowedTypes={['admin']}><AdminMessaging /></ProtectedRoute>} />
           <Route path="/admin-fees-management" element={<ProtectedRoute allowedTypes={['admin']}><AdminFeesManagement /></ProtectedRoute>} />
           <Route path="/admin-calendar-management" element={<ProtectedRoute allowedTypes={['admin']}><AdminCalendarManagement /></ProtectedRoute>} />
           <Route path="/admin-syllabus-management" element={<ProtectedRoute allowedTypes={['admin']}><AdminSyllabusManagement /></ProtectedRoute>} />
+          <Route path="/admin-result-approval" element={<ProtectedRoute allowedTypes={['admin']}><AdminResultsApproval/></ProtectedRoute>} />
+          
 
           {/* Student Protected Routes */}
           <Route path="/student-dashboard" element={<ProtectedRoute allowedTypes={['student']}><StudentDashboard /></ProtectedRoute>} />
@@ -164,8 +170,9 @@ function App() {
           <Route path="/staff-mails" element={<ProtectedRoute allowedTypes={['staff']}><StaffMails /></ProtectedRoute>} />
           <Route path="/staff-password-change" element={<ProtectedRoute allowedTypes={['staff']}><StaffPasswordChange /></ProtectedRoute>} />
           <Route path="/mark-attendance" element={<ProtectedRoute allowedTypes={['staff']}><MarkAttendance/></ProtectedRoute>} />
-
-
+          <Route path="/results-management" element={<ProtectedRoute allowedTypes={['admin', 'staff']}><ResultsManagement /></ProtectedRoute>} />
+          {/* MODIFIED LINE: Now allows both 'admin' and 'staff' */}
+          <Route path="/view-reports" element={<ProtectedRoute allowedTypes={['admin', 'staff']}><ViewReports /></ProtectedRoute>} />
           {/* Catch-all route for 404 pages */}
           <Route path="*" element={<h2>404 - Page Not Found</h2>} />
         </Routes>

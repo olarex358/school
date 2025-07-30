@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import useLocalStorage from '../hooks/useLocalStorage';
 import { useNavigate } from 'react-router-dom';
 
-function ViewReports() {
+function ViewReports() { console.log('ViewReports component is mounting!')
   const [loggedInUser, setLoggedInUser] = useState(null);
   const navigate = useNavigate();
 
