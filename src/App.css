@@ -861,3 +861,223 @@ table th {
     margin-bottom: 40px;
   }
 }
+/* src/App.css */
+
+/* --- Timetable Specific Styles --- */
+
+.timetable-grid-container {
+  display: grid;
+  /* This creates a grid layout */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  /* Auto-fit columns, min 200px, max 1fr */
+  gap: 20px;
+  /* Space between day columns */
+  margin-top: 20px;
+  padding: 10px;
+  background-color: var(--white-bg);
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border-color);
+}
+
+.timetable-day-column {
+  background-color: #e9f5ff;
+  /* Light blue background for each day column */
+  border: 1px solid var(--primary-blue);
+  border-radius: 8px;
+  padding: 15px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+}
+
+.timetable-day-column h3 {
+  color: var(--primary-blue-dark);
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 1.2em;
+  border-bottom: 2px solid var(--primary-blue);
+  padding-bottom: 10px;
+}
+
+.timetable-day-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-grow: 1;
+  /* Allows the card container to grow */
+}
+
+.timetable-card {
+  background-color: #f0f8ff;
+  /* Very light blue for cards */
+  border: 1px solid #cceeff;
+  /* Light border */
+  border-radius: 6px;
+  padding: 10px;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  font-size: 0.9em;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease;
+}
+
+.timetable-card:hover {
+  transform: translateY(-2px);
+}
+
+.timetable-card strong {
+  font-size: 1em;
+  color: var(--text-color-dark);
+  margin-bottom: 5px;
+}
+
+.timetable-card p {
+  margin: 0;
+  font-weight: bold;
+  color: #444;
+}
+
+.timetable-card small {
+  color: #666;
+  font-size: 0.85em;
+  margin-top: 5px;
+}
+
+/* Responsive adjustments for Timetable */
+@media (max-width: 768px) {
+  .timetable-grid-container {
+    grid-template-columns: 1fr;
+    /* Stack columns on small screens */
+    padding: 5px;
+    gap: 15px;
+  }
+
+  .timetable-day-column {
+    padding: 10px;
+  }
+
+  .timetable-day-column h3 {
+    font-size: 1.1em;
+    margin-bottom: 10px;
+  }
+
+  .timetable-card {
+    min-height: 70px;
+    padding: 8px;
+    font-size: 0.85em;
+  }
+}
+
+@media (max-width: 480px) {
+  .timetable-grid-container {
+    gap: 10px;
+  }
+
+  .timetable-card {
+    min-height: 60px;
+    font-size: 0.8em;
+  }
+}
+
+/* src/App.css */
+
+/* ... existing CSS ... */
+
+/* --- Timetable Specific Styles --- */
+.timetable-responsive-table {
+  overflow-x: auto;
+  /* Allows horizontal scrolling on small screens */
+  margin-top: 20px;
+  background: var(--white-bg);
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border-color);
+}
+
+.timetable-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+}
+
+.timetable-table th,
+.timetable-table td {
+  border: 1px solid var(--border-color);
+  padding: 10px 5px;
+  /* Adjust padding */
+  text-align: center;
+  vertical-align: middle;
+  font-size: 0.9em;
+}
+
+.timetable-table th {
+  background-color: var(--medium-bg);
+  font-weight: bold;
+  color: var(--text-color-dark);
+  padding: 12px 5px;
+}
+
+.timetable-table td {
+  height: 80px;
+  /* Give cells a fixed height for consistency */
+}
+
+/* Style for the time slot column */
+.timetable-table tbody tr td:first-child {
+  background-color: var(--medium-bg);
+  font-weight: bold;
+  color: var(--text-color-dark);
+  text-align: left;
+  min-width: 90px;
+  /* Ensure time slot column is wide enough */
+}
+
+/* Colors for timetable entries */
+.timetable-table td[style*="background-color: lightblue"] {
+  background-color: var(--primary-blue) !important;
+  color: white !important;
+}
+
+.timetable-table td span {
+  color: #888;
+}
+
+/* Responsive adjustments for timetable table */
+@media (max-width: 768px) {
+
+  .timetable-table th,
+  .timetable-table td {
+    font-size: 0.8em;
+    padding: 8px 3px;
+  }
+
+  .timetable-table td {
+    height: 60px;
+    /* Smaller height on small screens */
+  }
+
+  .timetable-table tbody tr td:first-child {
+    min-width: 70px;
+  }
+}
+
+@media (max-width: 480px) {
+
+  .timetable-table th,
+  .timetable-table td {
+    font-size: 0.7em;
+    padding: 6px 2px;
+  }
+
+  .timetable-table td {
+    height: 50px;
+  }
+
+  .timetable-table tbody tr td:first-child {
+    min-width: 60px;
+  }
+}

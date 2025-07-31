@@ -11,6 +11,7 @@ import calendarIcon from '../icon/calender.png'; //
 import feesIcon from '../icon/fees.png'; //
 import mailsIcon from '../icon/mails.png'; //
 import passwordIcon from '../icon/password.png'; //
+import timetableIcon from '../icon/calender.png';
 
 
 function StudentDashboard() {
@@ -49,8 +50,9 @@ function StudentDashboard() {
                 <li><Link to="/student-attendance">My Attendance</Link></li>
                 <li><Link to="/student-fees">My Fees</Link></li>
                 <li><Link to="/student-mails">My Mails</Link></li>
-                <li><Link to="/student-password-change"></Link>Change Password</li>
+                <li><Link to="/student-password-change">Change password</Link></li>
                 <li><Link to="/student-subject">My Subjects</Link></li>
+                 <li><Link to="/student-timetable">My Timetable</Link></li>
 
             </ul>
             <button type="button" onClick={handleLogout}>Logout</button>
@@ -71,7 +73,9 @@ function StudentDashboard() {
                 <Link to="/student-calendar"><div className="card"> <img src={calendarIcon} alt="Calendar" width="50px" height="50px" />Calendar</div></Link> {/* */}
                 <Link to="/student-fees"><div className="card"> <img src={feesIcon} alt="My fees" width="50px" height="50px" />My fees</div></Link> {/* */}
                 <Link to="/student-mails"><div className="card"> <img src={mailsIcon} alt="Mails" width="50px" height="50px" />Mails</div></Link> {/* */}
-                <Link to="/student-password-change"><div className="card"><img src={passwordIcon} alt="Password" width="50px" height="50px" /> Password</div></Link> {/* */}
+                <Link to="/student-password-change"><div className="card"><img src={passwordIcon} alt="Password" width="50px" height="50px" /> Password</div></Link>
+                <Link to="/student-timetable"><div className="card"> <img src={timetableIcon} alt="My Timetable" width="50px" height="50px" />My Timetable</div></Link>
+                 {/* */}
             </div>
         </div>
     </div>

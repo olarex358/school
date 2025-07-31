@@ -49,6 +49,9 @@ import AdminCalendarManagement from './pages/AdminCalendarManagement';
 import AdminSyllabusManagement from './pages/AdminSyllabusManagement';
 import MarkAttendance from './pages/MarkAttendance'
 import AdminResultsApproval from './pages/AdminResultsApproval';
+import AdminTimetableManagement from './pages/AdminTimetableManagement';
+import StudentTimetable from './pages/StudentTimetable';
+import StaffTimetable from './pages/StaffTimetable';
 
 
 // Helper component for protected routes
@@ -138,7 +141,7 @@ function App() {
           <Route path="/dashboard" element={<ProtectedRoute allowedTypes={['admin']}><Dashboard /></ProtectedRoute>} />
           <Route path="/student-management" element={<ProtectedRoute allowedTypes={['admin']}><StudentManagement /></ProtectedRoute>} />
           <Route path="/staff-management" element={<ProtectedRoute allowedTypes={['admin']}><StaffManagement /></ProtectedRoute>} />
-
+           <Route path="/admin-timetable-management" element={<ProtectedRoute allowedTypes={['admin']}><AdminTimetableManagement /></ProtectedRoute>} /> {/* */}
 <Route path="/results-management" element={<ProtectedRoute allowedTypes={['admin', 'staff']}><ResultsManagement /></ProtectedRoute>} />
 <Route path="/view-reports" element={<ProtectedRoute allowedTypes={['admin', 'staff']}><ViewReports /></ProtectedRoute>} /><Route path="/academic-management" element={<ProtectedRoute allowedTypes={['admin']}><AcademicManagement /></ProtectedRoute>} />
           <Route path="/user-permissions-management" element={<ProtectedRoute allowedTypes={['admin']}><UserPermissionsManagement /></ProtectedRoute>} />
@@ -161,6 +164,7 @@ function App() {
           <Route path='/student-fees' element={<ProtectedRoute allowedTypes={['student']}><StudentFees /></ProtectedRoute>} />
           <Route path='/student-mails' element={<ProtectedRoute allowedTypes={['student']}><StudentMails /></ProtectedRoute>} />
           <Route path='/student-password-change' element={<ProtectedRoute allowedTypes={['student']}><StudentPasswordChange /></ProtectedRoute>} />
+          <Route path='/student-timetable' element={<ProtectedRoute allowedTypes={['student']}><StudentTimetable /></ProtectedRoute>} />
 
           {/* Staff Protected Routes */}
           <Route path="/staff-dashboard" element={<ProtectedRoute allowedTypes={['staff']}><StaffDashboard/></ProtectedRoute>} />
@@ -173,6 +177,7 @@ function App() {
           <Route path="/results-management" element={<ProtectedRoute allowedTypes={['admin', 'staff']}><ResultsManagement /></ProtectedRoute>} />
           {/* MODIFIED LINE: Now allows both 'admin' and 'staff' */}
           <Route path="/view-reports" element={<ProtectedRoute allowedTypes={['admin', 'staff']}><ViewReports /></ProtectedRoute>} />
+          <Route path="/staff-timetable" element={<ProtectedRoute allowedTypes={['staff']}><StaffTimetable /></ProtectedRoute>} /> 
           {/* Catch-all route for 404 pages */}
           <Route path="*" element={<h2>404 - Page Not Found</h2>} />
         </Routes>
