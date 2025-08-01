@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useLocalStorage from '../hooks/useLocalStorage';
+import { Link } from 'react-router-dom';
 
 function AdminCalendarManagement() {
   const navigate = useNavigate();
@@ -199,6 +200,13 @@ function AdminCalendarManagement() {
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{ width: '100%', padding: '8px', marginBottom: '15px' }}
         />
+        <div style={{ marginBottom: '15px' }}>
+            <Link to="/public-calendar" style={{ textDecoration: 'none' }}>
+                <button type="button" style={{ backgroundColor: 'var(--primary-blue-dark)', borderColor: 'var(--primary-blue-dark)' }}>
+                    View Public Calendar
+                </button>
+            </Link>
+        </div>
         <div className="table-container">
           <table>
             <thead>

@@ -1,15 +1,18 @@
 // src/components/Header.js
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import useLocalStorage from '../hooks/useLocalStorage';
 import styles from './Header.module.css';
-
-// Import logo image
 import logo from '../pages/logo.png';
+import useNotifications from '../hooks/useNotifications';
+import notificationIcon from '../icon/bell.png';
+import NotificationsDropdown from './NotificationsDropdown';
 
 function Header() {
   const navigate = useNavigate();
   const [loggedInUser, setLoggedInUser] = useLocalStorage('loggedInUser', null);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const { unreadCount } = useNotifications();
 
   const handleLogout = () => {
     setLoggedInUser(null);
@@ -19,13 +22,13 @@ function Header() {
 
   const renderNavLinks = () => {
     let linksToRender = [];
-
     if (!loggedInUser) {
       // Public / Not Logged In Links - Simplified
       linksToRender = [
+        
         { to: "/home", text: "Home" },
-        { to: "/news", text: "News" }, // Placeholder News page
-        { to: "/#contact", text: "Contact" }, // Link to section ID on HomePage
+        { to: "/news", text: "News" },
+        { to: "/#contact", text: "Contact" },
         { to: "/login", text: "Login" },
       ];
     } else if (loggedInUser.type === 'admin') {
@@ -34,7 +37,6 @@ function Header() {
         { to: "/dashboard", text: "Dashboard" },
         { to: "/news", text: "News" },
         { to: "/#contact", text: "Contact" },
-        // All other management links are accessed from the Admin Dashboard sidebar/cards
       ];
     } else if (loggedInUser.type === 'student') {
       // Student Links - Minimalist (Dashboard and Profile are key)
@@ -43,7 +45,6 @@ function Header() {
         { to: "/student-profile", text: "Profile" },
         { to: "/news", text: "News" },
         { to: "/#contact", text: "Contact" },
-        // Other student-specific links are accessed from the Student Dashboard sidebar/cards
       ];
     } else if (loggedInUser.type === 'staff') {
       // Staff Links - Minimalist (Dashboard and Profile are key)
@@ -52,7 +53,6 @@ function Header() {
         { to: "/staff-profile", text: "Profile" },
         { to: "/news", text: "News" },
         { to: "/#contact", text: "Contact" },
-        // Other staff-specific links are accessed from the Staff Dashboard sidebar/cards
       ];
     }
 
@@ -74,19 +74,23 @@ function Header() {
       {/* Top bar for user info/logout when logged in */}
       {loggedInUser && (
         <div className={styles.topBar}>
-            <span className={styles.welcomeText}>
-                Welcome, {loggedInUser.type === 'admin' ? loggedInUser.username : loggedInUser.firstname}!
-            </span>
-            <button onClick={handleLogout} className={styles.logoutButton}>Logout</button>
+          <span className={styles.welcomeText}>
+            Welcome, {loggedInUser.type === 'admin' ? loggedInUser.username : loggedInUser.firstname}!
+          </span>
+          {/* NEW JSX for notification icon and counter */}
+          <div className={styles.notificationContainer} onClick={() => setShowDropdown(!showDropdown)}>
+            <img src={notificationIcon} alt="Notifications" className={styles.notificationIcon} />
+            {unreadCount > 0 && <span className={styles.notificationBadge}>{unreadCount}</span>}
+          </div>
+          <button onClick={handleLogout} className={styles.logoutButton}>Logout</button>
+          {/* NEW CONDITIONAL RENDERING for the dropdown */}
+          {showDropdown && <NotificationsDropdown onClose={() => setShowDropdown(false)} />}
         </div>
       )}
-
-      {/* Main Logo and Slogan Area - matches image_73e18b.png */}
+      {/* Main Logo and Slogan Area */}
       <div className={styles.mainHeaderContent}>
         <img src={logo} alt="Busarialao College Logo" className={styles.headerLogo} />
-      
       </div>
-
       {/* Main Navigation - always present, content changes based on login */}
       <nav className={styles.mainNav}>
         <ul className={styles['nav-links']}>

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import useLocalStorage from '../hooks/useLocalStorage';
 import { useNavigate } from 'react-router-dom';
+import useNotifications from '../hooks/useNotifications';
 
 function AdminMessaging() {
   const navigate = useNavigate();
@@ -10,8 +11,12 @@ function AdminMessaging() {
   // Load all students and staff to populate recipient dropdowns
   const [students] = useLocalStorage('schoolPortalStudents', []);
   const [staffs] = useLocalStorage('schoolPortalStaff', []);
+
   // Store messages sent by admin
   const [adminMessages, setAdminMessages] = useLocalStorage('schoolPortalAdminMessages', []);
+
+  // NEW LINE: Use the new hook
+  const { addNotification } = useNotifications();
 
   // Form states
   const [recipientType, setRecipientType] = useState('allStudents'); // 'allStudents', 'individualStudent', 'allStaff', 'individualStaff'
@@ -53,40 +58,54 @@ function AdminMessaging() {
   const handleSendMessage = (e) => {
     e.preventDefault();
     setMessage(null);
-
     if (!validateForm()) {
       setMessage({ type: 'error', text: 'Please correct the errors in the form.' });
       return;
     }
 
     const newMessage = {
-      id: Date.now(), // Simple unique ID
+      id: Date.now(),
       sender: loggedInAdmin ? loggedInAdmin.username : 'Admin',
       subject: messageSubject,
       body: messageBody,
       timestamp: new Date().toISOString(),
       recipientType: recipientType,
-      recipientId: selectedRecipientId || null, // Null for 'all' types
-      read: false // Messages start as unread
+      recipientId: selectedRecipientId || null,
+      isRead: false,
     };
-
     // Simulate sending: Add message to localStorage
     setAdminMessages(prevMessages => [...prevMessages, newMessage]);
+    
+    // NEW NOTIFICATION LOGIC:
+    let notificationTitle = `New Admin Message: ${messageSubject}`;
+    let notificationBody = messageBody;
 
-    // Simulate external sending (email/WhatsApp)
     if (recipientType.includes('individual')) {
         const recipientName = recipientType === 'individualStudent'
             ? (students.find(s => s.admissionNo === selectedRecipientId)?.firstName + ' ' + students.find(s => s.admissionNo === selectedRecipientId)?.lastName || selectedRecipientId)
             : (staffs.find(s => s.staffId === selectedRecipientId)?.firstname + ' ' + staffs.find(s => s.staffId === selectedRecipientId)?.surname || selectedRecipientId);
-        setMessage({ type: 'success', text: `Message sent to ${recipientName} (simulated email/WhatsApp).` });
+        
+        // Add a notification for the recipient
+        addNotification({
+            title: notificationTitle,
+            body: notificationBody,
+            recipientType: recipientType,
+            recipientId: selectedRecipientId
+        });
+        setMessage({ type: 'success', text: `Message and notification sent to ${recipientName} (simulated email/WhatsApp).` });
         console.log(`Simulating email/WhatsApp to ${recipientName}: Subject: "${messageSubject}", Body: "${messageBody}"`);
     } else if (recipientType.includes('all')) {
-        setMessage({ type: 'success', text: `Message sent to all ${recipientType.replace('all', '')} (simulated).` });
+        addNotification({
+            title: notificationTitle,
+            body: notificationBody,
+            recipientType: recipientType,
+            recipientId: null
+        });
+        setMessage({ type: 'success', text: `Message and notification sent to all ${recipientType.replace('all', '')} (simulated).` });
         console.log(`Simulating message to all ${recipientType.replace('all', '')}: Subject: "${messageSubject}", Body: "${messageBody}"`);
     } else {
         setMessage({ type: 'success', text: 'Message sent successfully (simulated).' });
     }
-
 
     // Reset form
     setSelectedRecipientId('');
@@ -112,7 +131,6 @@ function AdminMessaging() {
     <div className="content-section">
       <h1>Admin Messaging</h1>
       <p>Compose and send internal messages to students and staff.</p>
-
       <div className="sub-section">
         <h2>Compose New Message</h2>
         {message && (
@@ -126,7 +144,7 @@ function AdminMessaging() {
             <select
               id="recipientType"
               value={recipientType}
-              onChange={(e) => { setRecipientType(e.target.value); setSelectedRecipientId(''); setFormErrors({}); }}
+              onChange={(e) => { setSelectedRecipientId(''); setRecipientType(e.target.value); setFormErrors({}); }}
               style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
             >
               <option value="allStudents">All Students</option>
@@ -135,7 +153,6 @@ function AdminMessaging() {
               <option value="individualStaff">Individual Staff</option>
             </select>
           </div>
-
           {(recipientType === 'individualStudent' || recipientType === 'individualStaff') && (
             <div style={{ marginBottom: '15px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <label htmlFor="selectedRecipientId">Select Recipient:</label>
@@ -153,7 +170,6 @@ function AdminMessaging() {
               {formErrors.selectedRecipientId && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.selectedRecipientId}</p>}
             </div>
           )}
-
           <div style={{ marginBottom: '15px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <label htmlFor="messageSubject">Subject:</label>
             <input
@@ -166,7 +182,6 @@ function AdminMessaging() {
             />
             {formErrors.messageSubject && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.messageSubject}</p>}
           </div>
-
           <div style={{ marginBottom: '15px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <label htmlFor="messageBody">Message:</label>
             <textarea
@@ -179,7 +194,6 @@ function AdminMessaging() {
             ></textarea>
             {formErrors.messageBody && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.messageBody}</p>}
           </div>
-
           <button type="submit" style={{ padding: '10px 20px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
             Send Message
           </button>

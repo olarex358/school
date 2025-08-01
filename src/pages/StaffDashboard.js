@@ -12,6 +12,7 @@ import mailsIcon from '../icon/mails.png';
 import passwordIcon from '../icon/password.png';
 import attendanceIcon from '../icon/attendance.png';
 import timetableIcon from '../icon/calender.png'; 
+import libraryIcon from '../icon/library.png'
 
 function StaffDashboard() {
   const [staffInfo, setStaffInfo] = useState(null);
@@ -59,7 +60,8 @@ function StaffDashboard() {
                 <li><Link to="/staff-calendar">School Calendar</Link></li>
                 <li><Link to="/staff-mails">Internal Mails</Link></li>
                 <li><Link to="/mark-attendance">Mark Attendance</Link></li>
-                <li><Link to="/staff-timetable">My Timetable</Link></li> 
+                <li><Link to="/staff-timetable">My Timetable</Link></li>
+                <li><Link to="/staff-digital-library">Digital Library</Link></li> 
                 <li><Link to="/staff-password-change">Change Password</Link></li>
             </ul>
             <button type="button" onClick={handleLogout}>Logout</button>
@@ -111,6 +113,10 @@ function StaffDashboard() {
                  <div className="card" onClick={() => handleCardClick('/staff-timetable')}>
                     <img src={timetableIcon} alt="My Timetable" width="50px" height="50px" />
                     My Timetable
+                </div>
+                <div className="card" onClick={() => handleCardClick('/staff-digital-library')}>
+                    <img src={libraryIcon} alt="Digital Library" width="50px" height="50px" />
+                    Digital Library
                 </div>
                 <div className="card" onClick={() => handleCardClick('/staff-password-change')}>
                     <img src={passwordIcon} alt="Change Password" width="50px" height="50px" />

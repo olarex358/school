@@ -12,6 +12,7 @@ import feesIcon from '../icon/fees.png'; //
 import mailsIcon from '../icon/mails.png'; //
 import passwordIcon from '../icon/password.png'; //
 import timetableIcon from '../icon/calender.png';
+import libraryIcon from '../icon/library.png';
 
 
 function StudentDashboard() {
@@ -46,13 +47,15 @@ function StudentDashboard() {
                 <li><Link to="/student-results">My Results</Link></li> {/* Link to results.html */}
                 <li><Link to="/student-syllabus">My syllabus</Link></li> {/* Link to syllabus.html */}
                 <li><Link to="/student-certification">My certification</Link></li> {/* Link to certification.html */}
-                <li><Link to="/stuudent-calendee">My Calender</Link></li>
+                <li><Link to="/student-calendar">My Calender</Link></li>
                 <li><Link to="/student-attendance">My Attendance</Link></li>
                 <li><Link to="/student-fees">My Fees</Link></li>
                 <li><Link to="/student-mails">My Mails</Link></li>
                 <li><Link to="/student-password-change">Change password</Link></li>
                 <li><Link to="/student-subject">My Subjects</Link></li>
                  <li><Link to="/student-timetable">My Timetable</Link></li>
+                  <li><Link to="/student-digital-library">Digital Library</Link></li>
+
 
             </ul>
             <button type="button" onClick={handleLogout}>Logout</button>
@@ -75,6 +78,9 @@ function StudentDashboard() {
                 <Link to="/student-mails"><div className="card"> <img src={mailsIcon} alt="Mails" width="50px" height="50px" />Mails</div></Link> {/* */}
                 <Link to="/student-password-change"><div className="card"><img src={passwordIcon} alt="Password" width="50px" height="50px" /> Password</div></Link>
                 <Link to="/student-timetable"><div className="card"> <img src={timetableIcon} alt="My Timetable" width="50px" height="50px" />My Timetable</div></Link>
+
+                <Link to="/student-digital-library"><div className="card"> <img src={libraryIcon} alt="Digital library" width="50px" height="50px" />Digital Library</div></Link>
+                
                  {/* */}
             </div>
         </div>
