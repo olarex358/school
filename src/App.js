@@ -15,9 +15,9 @@ import StudentSyllabus from './pages/StudentSyllabus';
 import StudentCertification from './pages/StudentCertification';
 import StudentAttendance from './pages/StudentAttendance';
 import StudentSubjects from './pages/StudentSubjects';
-import StudentCalendar from './pages/StudentCalendar'; // Corrected path and spelling
+import StudentCalendar from './pages/StudentCalendar';
 import StudentFees from './pages/StudentFees';
-import StudentMails from './pages/StudentMails'; // Corrected path
+import StudentMails from './pages/StudentMails';
 import StudentPasswordChange from './pages/StudentPasswordChange';
 import StaffProfile from './pages/StaffProfile';
 import Dashboard from './pages/Dashboard';
@@ -26,7 +26,7 @@ import StaffManagement from './pages/StaffManagement';
 import ResultsManagement from './pages/ResultsManagement';
 import ViewReports from './pages/ViewReports';
 import AcademicManagement from './pages/AcademicManagement';
-import UserPermissionsManagement from './pages/UserPermissionsManagement'; // Corrected path
+import UserPermissionsManagement from './pages/UserPermissionsManagement';
 
 // Import dashboards
 import StudentDashboard from './pages/StudentDashboard';
@@ -40,8 +40,6 @@ import StaffPasswordChange from './pages/StaffPasswordChange';
 
 // Import Admin Messaging
 import AdminMessaging from './pages/AdminMessaging';
-
-// Import AdminFeesManagement
 import AdminFeesManagement from './pages/AdminFeesManagement';
 
 // Import Admin Calendar and Syllabus Management
@@ -54,13 +52,15 @@ import StudentTimetable from './pages/StudentTimetable';
 import StaffTimetable from './pages/StaffTimetable';
 import AdminDigitalLibrary from './pages/AdminDigitalLibrary';
 import UserDigitalLibrary from './pages/UserDigitalLibrary';
-
+// CORRECTED IMPORT:
+import AdminCertificationManagement from './pages/AdminCertificationManagement';
+import StudentCertificationRegistration from './pages/StudentCertificationRegistration';
 // Helper component for protected routes
 const ProtectedRoute = ({ children, allowedTypes }) => {
   const loggedInUser = JSON.parse(localStorage.getItem('loggedInUser'));
- console.log('ProtectedRoute check:');
- console.log('loggedInUser:',loggedInUser);
- console.log('allowedTypes:',allowedTypes);
+  console.log('ProtectedRoute check:');
+  console.log('loggedInUser:',loggedInUser);
+  console.log('allowedTypes:',allowedTypes);
   if (!loggedInUser) { console.log('->Not loggedin,redirecting to /login');
     return <Navigate to="/login" replace />;
   }
@@ -68,17 +68,16 @@ const ProtectedRoute = ({ children, allowedTypes }) => {
   // Ensure allowedTypes is always an array before using .includes
   if (allowedTypes && !Array.isArray(allowedTypes)) {
       console.error("ProtectedRoute: allowedTypes must be an array.");
-      return <Navigate to="/login" replace />; // Or redirect to a generic error page
+    return <Navigate to="/login" replace />; // Or redirect to a generic error page
   }
 
-  if (allowedTypes && !allowedTypes.includes(loggedInUser.type)) 
+  if (allowedTypes && !allowedTypes.includes(loggedInUser.type))
     { console.log('-> User type not allowed,redirectig based on type');
     if (loggedInUser.type === 'admin') return <Navigate to="/dashboard" replace />;
     if (loggedInUser.type === 'student') return <Navigate to="/student-dashboard" replace />;
     if (loggedInUser.type === 'staff') return <Navigate to="/staff-dashboard" replace />;
     return <Navigate to="/login" replace />; // Fallback
   }console.log('->Access granted');
-
   return children;
 };
 
@@ -94,7 +93,6 @@ function App() {
       return null;
     }
   });
-
   // Effect to listen for localStorage changes for loggedInUser (e.g., logout from another tab)
   useEffect(() => {
     const handleStorageChange = () => {
@@ -103,7 +101,8 @@ function App() {
     };
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
-  }, []); // Runs once on mount and cleans up on unmount
+  }, []);
+  // Runs once on mount and cleans up on unmount
 
 
   return (
@@ -138,21 +137,23 @@ function App() {
             )
           } />
 
-          {/* Admin Protected Routes */}
+            {/* Admin Protected Routes */}
           <Route path="/dashboard" element={<ProtectedRoute allowedTypes={['admin']}><Dashboard /></ProtectedRoute>} />
           <Route path="/student-management" element={<ProtectedRoute allowedTypes={['admin']}><StudentManagement /></ProtectedRoute>} />
           <Route path="/staff-management" element={<ProtectedRoute allowedTypes={['admin']}><StaffManagement /></ProtectedRoute>} />
-           <Route path="/admin-timetable-management" element={<ProtectedRoute allowedTypes={['admin']}><AdminTimetableManagement /></ProtectedRoute>} /> {/* */}
-<Route path="/results-management" element={<ProtectedRoute allowedTypes={['admin', 'staff']}><ResultsManagement /></ProtectedRoute>} />
-<Route path="/view-reports" element={<ProtectedRoute allowedTypes={['admin', 'staff']}><ViewReports /></ProtectedRoute>} /><Route path="/academic-management" element={<ProtectedRoute allowedTypes={['admin']}><AcademicManagement /></ProtectedRoute>} />
+          <Route path="/results-management" element={<ProtectedRoute allowedTypes={['admin']}><ResultsManagement /></ProtectedRoute>} />
+          <Route path="/admin-results-approval" element={<ProtectedRoute allowedTypes={['admin']}><AdminResultsApproval /></ProtectedRoute>} />
+          <Route path="/view-reports" element={<ProtectedRoute allowedTypes={['admin']}><ViewReports /></ProtectedRoute>} />
+          <Route path="/academic-management" element={<ProtectedRoute allowedTypes={['admin']}><AcademicManagement /></ProtectedRoute>} />
           <Route path="/user-permissions-management" element={<ProtectedRoute allowedTypes={['admin']}><UserPermissionsManagement /></ProtectedRoute>} />
           <Route path="/admin-messaging" element={<ProtectedRoute allowedTypes={['admin']}><AdminMessaging /></ProtectedRoute>} />
           <Route path="/admin-fees-management" element={<ProtectedRoute allowedTypes={['admin']}><AdminFeesManagement /></ProtectedRoute>} />
           <Route path="/admin-calendar-management" element={<ProtectedRoute allowedTypes={['admin']}><AdminCalendarManagement /></ProtectedRoute>} />
           <Route path="/admin-syllabus-management" element={<ProtectedRoute allowedTypes={['admin']}><AdminSyllabusManagement /></ProtectedRoute>} />
-          <Route path="/admin-results-approval" element={<ProtectedRoute allowedTypes={['admin']}><AdminResultsApproval /></ProtectedRoute>} />
+          <Route path="/admin-timetable-management" element={<ProtectedRoute allowedTypes={['admin']}><AdminTimetableManagement /></ProtectedRoute>} />
           <Route path="/admin-digital-library" element={<ProtectedRoute allowedTypes={['admin']}><AdminDigitalLibrary /></ProtectedRoute>} />
-          
+          <Route path="/admin-certification-management" element={<ProtectedRoute allowedTypes={['admin']}><AdminCertificationManagement /></ProtectedRoute>} />
+
 
           {/* Student Protected Routes */}
           <Route path="/student-dashboard" element={<ProtectedRoute allowedTypes={['student']}><StudentDashboard /></ProtectedRoute>} />
@@ -168,6 +169,7 @@ function App() {
           <Route path='/student-password-change' element={<ProtectedRoute allowedTypes={['student']}><StudentPasswordChange /></ProtectedRoute>} />
           <Route path='/student-timetable' element={<ProtectedRoute allowedTypes={['student']}><StudentTimetable /></ProtectedRoute>} />
           <Route path='/student-digital-library' element={<ProtectedRoute allowedTypes={['student']}><UserDigitalLibrary /></ProtectedRoute>} />
+          <Route path='/student-certification-registration' element={<ProtectedRoute allowedTypes={['student']}><StudentCertificationRegistration /></ProtectedRoute>} />
           {/* Staff Protected Routes */}
           <Route path="/staff-dashboard" element={<ProtectedRoute allowedTypes={['staff']}><StaffDashboard/></ProtectedRoute>} />
           <Route path="/staff-profile" element={<ProtectedRoute allowedTypes={['staff']}><StaffProfile /></ProtectedRoute>} />
@@ -177,10 +179,10 @@ function App() {
           <Route path="/staff-password-change" element={<ProtectedRoute allowedTypes={['staff']}><StaffPasswordChange /></ProtectedRoute>} />
           <Route path="/mark-attendance" element={<ProtectedRoute allowedTypes={['staff']}><MarkAttendance/></ProtectedRoute>} />
           <Route path="/results-management" element={<ProtectedRoute allowedTypes={['admin', 'staff']}><ResultsManagement /></ProtectedRoute>} />
-          {/* MODIFIED LINE: Now allows both 'admin' and 'staff' */}
           <Route path="/view-reports" element={<ProtectedRoute allowedTypes={['admin', 'staff']}><ViewReports /></ProtectedRoute>} />
-          <Route path="/staff-timetable" element={<ProtectedRoute allowedTypes={['staff']}><StaffTimetable /></ProtectedRoute>} /> 
+          <Route path="/staff-timetable" element={<ProtectedRoute allowedTypes={['staff']}><StaffTimetable /></ProtectedRoute>} />
           <Route path="/staff-digital-library" element={<ProtectedRoute allowedTypes={['staff']}><UserDigitalLibrary /></ProtectedRoute>} />
+          {/* Public Calendar Route */}
           {/* Catch-all route for 404 pages */}
           <Route path="*" element={<h2>404 - Page Not Found</h2>} />
         </Routes>

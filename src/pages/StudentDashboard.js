@@ -13,6 +13,7 @@ import mailsIcon from '../icon/mails.png'; //
 import passwordIcon from '../icon/password.png'; //
 import timetableIcon from '../icon/calender.png';
 import libraryIcon from '../icon/library.png';
+import certificationIcon from '../icon/certification.png';
 
 
 function StudentDashboard() {
@@ -54,6 +55,7 @@ function StudentDashboard() {
                 <li><Link to="/student-password-change">Change password</Link></li>
                 <li><Link to="/student-subject">My Subjects</Link></li>
                  <li><Link to="/student-timetable">My Timetable</Link></li>
+                  <li><Link to="/student-certification-registration">Register for Certificatin</Link></li>
                   <li><Link to="/student-digital-library">Digital Library</Link></li>
 
 
@@ -81,6 +83,8 @@ function StudentDashboard() {
 
                 <Link to="/student-digital-library"><div className="card"> <img src={libraryIcon} alt="Digital library" width="50px" height="50px" />Digital Library</div></Link>
                 
+                 <Link to="/student-certification-registration"><div className="card"> <img src={certificationIcon} alt="certification" width="50px" height="50px" />Register for Certification</div></Link>
+               
                  {/* */}
             </div>
         </div>

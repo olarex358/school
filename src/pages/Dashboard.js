@@ -16,6 +16,7 @@ import syllabusIcon from '../icon/sylabus.png';
 import pendingResultsIcon from '../icon/warning.png';
 import timetableIcon from '../icon/calender.png';
 import digitalLibraryIcon from '../icon/result.png';
+import certificationIcon from '../icon/certification.png';
 
 function Dashboard() {
   const navigate = useNavigate();
@@ -31,10 +32,12 @@ function Dashboard() {
   const [syllabusEntryCount, setSyllabusEntryCount] = useState(0);
   const [pendingResultsCount, setPendingResultsCount] = useState(0);
   const [digitalResourcesCount, setDigitalResourcesCount] = useState(0);
+  const [certificationCount, setCertificationCount] = useState(0);
 
   // Load data via hook for real-time updates
   const [pendingResults] = useLocalStorage('schoolPortalPendingResults', []);
   const [digitalResources] = useLocalStorage('schoolPortalDigitalLibrary', []);
+  const [certifications] = useLocalStorage('schoolPortalCertificationResults', []);
 
   useEffect(() => {
     const loggedInUser = JSON.parse(localStorage.getItem('loggedInUser'));
@@ -84,12 +87,13 @@ function Dashboard() {
     if (storedSyllabusEntries) {
         setSyllabusEntryCount(JSON.parse(storedSyllabusEntries).length);
     } else { setSyllabusEntryCount(0); }
-
+    
     // Update state based on hooks for real-time count
     setPendingResultsCount(pendingResults.length);
     setDigitalResourcesCount(digitalResources.length);
+    setCertificationCount(certifications.length);
     
-  }, [navigate, pendingResults, digitalResources]);
+  }, [navigate, pendingResults, digitalResources, certifications]);
 
   const handleCardClick = (path) => {
     navigate(path);
@@ -124,6 +128,7 @@ function Dashboard() {
             <li><Link to="/admin-syllabus-management">Syllabus Management</Link></li>
             <li><Link to="/admin-timetable-management">Timetable Management</Link></li>
             <li><Link to="/admin-digital-library">Digital Library ({digitalResourcesCount})</Link></li>
+            <li><Link to="/admin-certification-management">Certification Management ({certificationCount})</Link></li>
         </ul>
         <button type="button" id="logoutBtn" onClick={handleLogout}>Logout</button>
       </aside>
@@ -185,9 +190,14 @@ function Dashboard() {
                   <img src={digitalLibraryIcon} alt="Digital Library" width="50px" height="50px" />
                   Digital Library ({digitalResourcesCount})
               </div>
+              <div className="card" onClick={() => handleCardClick('/admin-certification-management')}>
+                  <img src={certificationIcon} alt="Certification Management" width="50px" height="50px" />
+                  Certification Management ({certificationCount})
+              </div>
           </div>
       </div>
     </div>
   );
 }
+
 export default Dashboard;

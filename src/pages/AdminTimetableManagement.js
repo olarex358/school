@@ -23,6 +23,7 @@ function AdminTimetableManagement() {
     startTime: '',
     endTime: '',
     location: '',
+    type:'',
   });
 
   const [formErrors, setFormErrors] = useState({});
@@ -222,7 +223,21 @@ function AdminTimetableManagement() {
             </select>
             {formErrors.classSelect && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.classSelect}</p>}
           </div>
-
+               <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
+        <label htmlFor="type" style={{ display: 'block', marginBottom: '5px' }}>Entry Type:</label>
+        <select
+          id="type"
+          value={timetableForm.type}
+          onChange={handleChange}
+          required
+          style={{ borderColor: formErrors.type ? 'red' : '' }}
+        >
+          <option value="Class">Class</option>
+          <option value="Exam">Exam</option>
+          <option value="CA">CA</option>
+        </select>
+        {formErrors.type && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.type}</p>}
+      </div>
           <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
             <label htmlFor="subjectSelect" style={{ display: 'block', marginBottom: '5px' }}>Subject:</label>
             <select
@@ -337,6 +352,7 @@ function AdminTimetableManagement() {
                 <th>Class</th>
                 <th>Subject</th>
                 <th>Teacher</th>
+                <th>Type</th>
                 <th>Day</th>
                 <th>Time</th>
                 <th>Location</th>
@@ -350,6 +366,7 @@ function AdminTimetableManagement() {
                     <td>{entry.classSelect}</td>
                     <td>{getSubjectName(entry.subjectSelect)}</td>
                     <td>{getTeacherName(entry.teacherSelect)}</td>
+                   <td>{entry.type}</td>
                     <td>{entry.day}</td>
                     <td>{`${entry.startTime} - ${entry.endTime}`}</td>
                     <td>{entry.location}</td>

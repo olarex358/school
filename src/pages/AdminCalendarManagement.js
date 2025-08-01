@@ -221,11 +221,10 @@ function AdminCalendarManagement() {
             <tbody>
               {filteredEvents.length > 0 ? (
                 filteredEvents.map(event => (
-                  <tr key={event.id}>
-                    <td>{event.title}</td>
+                  <tr key={event.id}><td>{event.title}</td>
                     <td>{event.date}</td>
                     <td>{event.description}</td>
-                    <td>{event.audience.charAt(0).toUpperCase() + event.audience.slice(1)}</td> {/* Capitalize first letter */}
+                    <td>{event.audience.charAt(0).toUpperCase() + event.audience.slice(1)}</td> 
                     <td>
                       <button className="action-btn edit-btn" onClick={() => editEvent(event.id)}>Edit</button>
                       <button className="action-btn delete-btn" onClick={() => deleteEvent(event.id)}>Delete</button>

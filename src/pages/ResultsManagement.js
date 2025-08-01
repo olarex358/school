@@ -3,51 +3,41 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useLocalStorage from '../hooks/useLocalStorage';
 
-function ResultsManagement() { console.log('ResultsManagement component is mounting')
+function ResultsManagement() {
   const navigate = useNavigate();
   const [loggedInUser, setLoggedInUser] = useState(null);
 
-  // Data from localStorage
   const [results, setResults] = useLocalStorage('schoolPortalResults', []);
   const [pendingResults, setPendingResults] = useLocalStorage('schoolPortalPendingResults', []);
   const [students] = useLocalStorage('schoolPortalStudents', []);
   const [subjects] = useLocalStorage('schoolPortalSubjects', []);
-  
+  const [staffs] = useLocalStorage('schoolPortalStaff', []);
 
-  // Form states
+  // NEW STATE: Redefined to match the new table format
   const [newResult, setNewResult] = useState({
     classSelect: '',
     studentNameSelect: '',
     subjectSelect: '',
     termSelect: '',
-    caType: '',
-    score: '',
+    firstCaScore: '',
+    secondCaScore: '',
+    assignmentScore: '',
+    examScore: '',
+    totalScore: 0,
+    grade: '',
     status: 'Pending',
+    submittedBy: '',
   });
-  
+
   const [submitButtonText, setSubmitButtonText] = useState('Add Result');
   const [isEditing, setIsEditing] = useState(false);
   const [editResultId, setEditResultId] = useState(null);
   const [studentIdFilter, setStudentIdFilter] = useState('');
-
-  // Define user roles and access flags at the top for use throughout the component
+  
   const isTeacher = loggedInUser && loggedInUser.type === 'staff' && loggedInUser.role.includes('Teacher');
   const isAdmin = loggedInUser && loggedInUser.type === 'admin';
-// src/pages/ResultsManagement.js (partial view)
-// ... code from Part 1 ...
-
-  // Helper functions to get names from IDs
-  const getStudentName = (admissionNo) => {
-    const student = students.find(s => s.admissionNo === admissionNo);
-    return student ? `${student.firstName} ${student.lastName}` : 'Unknown Student';
-  };
-
-  const getSubjectName = (subjectCode) => {
-    const subject = subjects.find(s => s.subjectCode === subjectCode);
-    return subject ? subject.subjectName : 'Unknown Subject';
-  };
-
-  // Effect to check login and set user info
+  
+  // Effect to check login
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('loggedInUser'));
     if (user && (user.type === 'admin' || (user.type === 'staff' && (user.role.includes('Teacher') || user.role.includes('Results Manager'))))) {
@@ -57,23 +47,34 @@ function ResultsManagement() { console.log('ResultsManagement component is mount
     }
   }, [navigate]);
 
-  // Derived data for form dropdowns
-  const uniqueClasses = [...new Set(students.map(s => s.studentClass))].sort();
+  // Helper function to get student name from ID
+  const getStudentName = (admissionNo) => {
+    const student = students.find(s => s.admissionNo === admissionNo);
+    return student ? `${student.firstName} ${student.lastName}` : 'Unknown Student';
+  };
 
-  const availableClassesForInput = isTeacher
-    ? uniqueClasses.filter(cls => loggedInUser.assignedClasses.includes(cls))
-    : uniqueClasses;
+  // Helper function to get subject name from code
+  const getSubjectName = (subjectCode) => {
+    const subject = subjects.find(s => s.subjectCode === subjectCode);
+    return subject ? subject.subjectName : 'Unknown Subject';
+  };
+  
+  // NEW HELPER FUNCTION to calculate total score and grade
+  const calculateTotalAndGrade = (firstCa, secondCa, assignment, exam) => {
+    const total = parseFloat(firstCa) + parseFloat(secondCa) + parseFloat(assignment) + parseFloat(exam);
+    let grade = '';
+    if (total >= 70) grade = 'A';
+    else if (total >= 60) grade = 'B';
+    else if (total >= 50) grade = 'C';
+    else if (total >= 40) grade = 'D';
+    else grade = 'F';
+    return { total, grade };
+  };
 
-  const availableStudentsForInput = isTeacher
-    ? students.filter(s => loggedInUser.assignedClasses.includes(s.studentClass))
-    : students;
-
-  const availableSubjectsForInput = isTeacher
-    ? subjects.filter(sub => loggedInUser.assignedSubjects.includes(sub.subjectCode))
-    : subjects;
+  // The rest of the component will be added in subsequent steps
 // src/pages/ResultsManagement.js (partial view)
-// ... code from Part 2 ...
-
+// ... code from Part 1 ...
+  
   // Handle input changes for the form
   const handleChange = (e) => {
     const { id, value } = e.target;
@@ -91,31 +92,39 @@ function ResultsManagement() { console.log('ResultsManagement component is mount
       !newResult.studentNameSelect ||
       !newResult.subjectSelect ||
       !newResult.termSelect ||
-      !newResult.caType ||
-      newResult.score === ''
+      newResult.firstCaScore === '' ||
+      newResult.secondCaScore === '' ||
+      newResult.assignmentScore === '' ||
+      newResult.examScore === ''
     ) {
       alert('Please fill in all required fields.');
       return;
     }
-    const score = parseInt(newResult.score);
-    if (isNaN(score) || score < 0 || score > 100) {
-      alert('Score must be a number between 0 and 100.');
-      return;
+    
+    // Validate scores are numbers between 0 and 100
+    const scores = [newResult.firstCaScore, newResult.secondCaScore, newResult.assignmentScore, newResult.examScore];
+    for (const score of scores) {
+      const numScore = parseInt(score);
+      if (isNaN(numScore) || numScore < 0 || numScore > 100) {
+        alert('All scores must be numbers between 0 and 100.');
+        return;
+      }
     }
 
-    const resultIdentifier = `${newResult.studentNameSelect}-${newResult.subjectSelect}-${newResult.termSelect}-${newResult.caType}`;
+    const { total, grade } = calculateTotalAndGrade(newResult.firstCaScore, newResult.secondCaScore, newResult.assignmentScore, newResult.examScore);
+    
+    const resultIdentifier = `${newResult.studentNameSelect}-${newResult.subjectSelect}-${newResult.termSelect}`;
     const resultToAddOrUpdate = { 
-        ...newResult, 
-        score: score, 
-        id: resultIdentifier,
-        submittedBy: loggedInUser?.staffId || 'Admin',
+      ...newResult, 
+      totalScore: total, 
+      grade: grade,
+      id: resultIdentifier,
+      submittedBy: loggedInUser?.staffId || 'Admin',
     };
 
     if (isTeacher) {
-      // Teacher workflow: Submit for approval
       resultToAddOrUpdate.status = 'Pending';
       setPendingResults(prevResults => {
-        // Check if this result already exists in the pending list
         const existingIndex = prevResults.findIndex(r => r.id === resultToAddOrUpdate.id);
         if (existingIndex > -1) {
           const updated = [...prevResults];
@@ -127,7 +136,6 @@ function ResultsManagement() { console.log('ResultsManagement component is mount
       });
       alert('Result submitted for approval!');
     } else {
-      // Admin workflow: Add or update directly to final results
       if (isEditing) {
         setResults(prevResults =>
           prevResults.map(result =>
@@ -151,18 +159,21 @@ function ResultsManagement() { console.log('ResultsManagement component is mount
       studentNameSelect: '',
       subjectSelect: '',
       termSelect: '',
-      caType: '',
-      score: '',
-      status: 'Pending'
+      firstCaScore: '',
+      secondCaScore: '',
+      assignmentScore: '',
+      examScore: '',
+      totalScore: 0,
+      grade: '',
+      status: 'Pending',
+      submittedBy: '',
     });
     setSubmitButtonText('Add Result');
     setIsEditing(false);
     setEditResultId(null);
   };
   
-  // Function to populate form for editing (handles both pending and approved)
   const editResult = (resultIdToEdit) => {
-    // Check pending results first, then final results
     const resultToEdit = pendingResults.find(r => r.id === resultIdToEdit) || results.find(r => r.id === resultIdToEdit);
     if (resultToEdit) {
       setNewResult(resultToEdit);
@@ -172,17 +183,14 @@ function ResultsManagement() { console.log('ResultsManagement component is mount
     }
   };
 
-  // Function to delete result (handles both pending and approved)
   const deleteResult = (resultIdToDelete) => {
     if (window.confirm(`Are you sure you want to delete this result entry?`)) {
-      // Delete from both lists, as it might exist in either
       setPendingResults(prevResults => prevResults.filter(result => result.id !== resultIdToDelete));
       setResults(prevResults => prevResults.filter(result => result.id !== resultIdToDelete));
       alert('Result deleted successfully!');
     }
   };
 
-  // Clear filter and reset form
   const clearFilterAndForm = () => {
     setStudentIdFilter('');
     setNewResult({
@@ -190,36 +198,67 @@ function ResultsManagement() { console.log('ResultsManagement component is mount
       studentNameSelect: '',
       subjectSelect: '',
       termSelect: '',
-      caType: '',
-      score: '',
-      status: 'Pending'
+      firstCaScore: '',
+      secondCaScore: '',
+      assignmentScore: '',
+      examScore: '',
+      totalScore: 0,
+      grade: '',
+      status: 'Pending',
+      submittedBy: '',
     });
     setSubmitButtonText('Add Result');
     setIsEditing(false);
     setEditResultId(null);
   };
+  
+// The rest of the component will be added in subsequent steps
 // src/pages/ResultsManagement.js (partial view)
-// ... code from Part 3 ...
+// ... code from Part 2 ...
 
-  // NEW: Filter results based on logged-in user's role and search term
-  // This logic is placed here, before the return statement, so the JSX can use the final filtered list.
+  const isResultsManager = loggedInUser && loggedInUser.type === 'staff' && loggedInUser.role.includes('Results Manager');
+
+  // Filter results based on logged-in user's role and search term
   const allResults = [...results, ...pendingResults];
   let resultsToDisplay = allResults;
 
   if (isTeacher) {
-    const teacherClasses = loggedInUser.assignedClasses || [];
-    const teacherSubjects = loggedInUser.assignedSubjects || [];
+    const teacherAssignedClasses = loggedInUser.assignedClasses || [];
+    const teacherAssignedSubjects = loggedInUser.assignedSubjects || [];
     const teacherId = loggedInUser.staffId;
 
     resultsToDisplay = allResults.filter(result =>
-        (teacherClasses.includes(result.classSelect) && teacherSubjects.includes(result.subjectSelect)) ||
+        (teacherAssignedClasses.includes(result.classSelect) && teacherAssignedSubjects.includes(result.subjectSelect)) ||
         (result.submittedBy === teacherId)
+    );
+  } else if (isResultsManager) {
+    // Results Manager sees all results for their assigned classes/subjects
+    const managerAssignedClasses = loggedInUser.assignedClasses || [];
+    const managerAssignedSubjects = loggedInUser.assignedSubjects || [];
+
+    resultsToDisplay = allResults.filter(result =>
+        managerAssignedClasses.includes(result.classSelect) && managerAssignedSubjects.includes(result.subjectSelect)
     );
   }
 
   const filteredResults = studentIdFilter
     ? resultsToDisplay.filter(result => result.studentNameSelect.toLowerCase().includes(studentIdFilter.toLowerCase()))
     : resultsToDisplay;
+
+  // Derived data for form dropdowns
+  const uniqueClasses = [...new Set(students.map(s => s.studentClass))].sort();
+
+  const availableClassesForInput = isTeacher || isResultsManager
+    ? uniqueClasses.filter(cls => (loggedInUser.assignedClasses || []).includes(cls))
+    : uniqueClasses;
+
+  const availableStudentsForInput = isTeacher || isResultsManager
+    ? students.filter(s => (loggedInUser.assignedClasses || []).includes(s.studentClass))
+    : students;
+
+  const availableSubjectsForInput = isTeacher || isResultsManager
+    ? subjects.filter(sub => (loggedInUser.assignedSubjects || []).includes(sub.subjectCode))
+    : subjects;
 
   if (!loggedInUser) {
     return <div className="content-section">Access Denied. Please log in as Admin or Staff.</div>;
@@ -284,50 +323,53 @@ function ResultsManagement() { console.log('ResultsManagement component is mount
             <option value="Term 2">Second Term</option>
             <option value="Term 3">Third Term</option>
           </select>
-          <select
-            id="caType"
-            required
-            value={newResult.caType}
-            onChange={handleChange}
-          >
-            <option value="">CA/Exam Type</option>
-            <option value="First CA">First CA</option>
-            <option value="Second CA">Second CA</option>
-            <option value="Exam">Exam</option>
-            <option value="Practical">Practical</option>
-            <option value="Certification">Certification</option>
-          </select>
           <input
             type="number"
-            id="score"
-            placeholder="Score (0-100)"
+            id="firstCaScore"
+            placeholder="1st CA Score (10%)"
             min="0"
-            max="100"
+            max="10"
             required
-            value={newResult.score}
+            value={newResult.firstCaScore}
             onChange={handleChange}
           />
-          {/* Conditional Status Dropdown for Admin */}
-          {isAdmin && (
-            <select
-                id="status"
-                value={newResult.status}
-                onChange={handleChange}
-            >
-                <option value="Pending">Pending</option>
-                <option value="Approved">Approved</option>
-                <option value="Rejected">Rejected</option>
-            </select>
-          )}
-          {/* Conditional Submit Button */}
+          <input
+            type="number"
+            id="secondCaScore"
+            placeholder="2nd CA Score (10%)"
+            min="0"
+            max="10"
+            required
+            value={newResult.secondCaScore}
+            onChange={handleChange}
+          />
+          <input
+            type="number"
+            id="assignmentScore"
+            placeholder="Assignment Score (20%)"
+            min="0"
+            max="20"
+            required
+            value={newResult.assignmentScore}
+            onChange={handleChange}
+          />
+          <input
+            type="number"
+            id="examScore"
+            placeholder="Exam Score (60%)"
+            min="0"
+            max="60"
+            required
+            value={newResult.examScore}
+            onChange={handleChange}
+          />
+
           {isAdmin ? (
-              <button type="submit">{submitButtonText}</button>
+            <button type="submit">{submitButtonText}</button>
           ) : (
-              <button type="submit">Submit for Approval</button>
+            <button type="submit">Submit for Approval</button>
           )}
-          <button type="button" onClick={() => alert('Export All Results (CSV) logic goes here!')}>
-            Export All Results (CSV)
-          </button>
+          <button type="button" onClick={clearFilterAndForm}>Clear / Reset Form</button>
         </form>
       </div>
       <div className="sub-section">
@@ -339,7 +381,6 @@ function ResultsManagement() { console.log('ResultsManagement component is mount
           value={studentIdFilter}
           onChange={(e) => setStudentIdFilter(e.target.value)}
         />
-        <button id="clearResultFilterBtn" onClick={clearFilterAndForm}>Clear Filter / Reset Form</button>
         <div className="table-container">
             <table id="resultsTable">
                 <thead>
@@ -348,8 +389,12 @@ function ResultsManagement() { console.log('ResultsManagement component is mount
                         <th>Class</th>
                         <th>Subject</th>
                         <th>Term</th>
-                        <th>Type</th>
-                        <th>Score</th>
+                        <th>1st CA (10%)</th>
+                        <th>2nd CA (10%)</th>
+                        <th>Assignment (20%)</th>
+                        <th>Exam (60%)</th>
+                        <th>Total (100%)</th>
+                        <th>Grade</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
@@ -366,8 +411,12 @@ function ResultsManagement() { console.log('ResultsManagement component is mount
                         <td>{result.classSelect}</td>
                         <td>{getSubjectName(result.subjectSelect)}</td>
                         <td>{result.termSelect}</td>
-                        <td>{result.caType}</td>
-                        <td>{result.score}</td>
+                        <td>{result.firstCaScore}</td>
+                        <td>{result.secondCaScore}</td>
+                        <td>{result.assignmentScore}</td>
+                        <td>{result.examScore}</td>
+                        <td><strong>{result.totalScore}</strong></td>
+                        <td><strong>{result.grade}</strong></td>
                         <td>
                           <span style={{ color: result.status === 'Approved' ? 'green' : result.status === 'Rejected' ? 'red' : 'orange' }}>
                             {result.status}
@@ -396,7 +445,7 @@ function ResultsManagement() { console.log('ResultsManagement component is mount
                     })
                 ) : (
                     <tr>
-                      <td colSpan="8">No results found.</td>
+                      <td colSpan="12">No results found.</td>
                     </tr>
                 )}
                 </tbody>

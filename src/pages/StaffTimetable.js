@@ -119,7 +119,8 @@ function StaffTimetable() {
                 ))}
               </tr>
             </thead>
-            <tbody>
+            <tbody>// src/pages/StaffTimetable.js (partial view)
+// ...
               {uniqueTimeSlots.map(slot => (
                 <tr key={slot}>
                   <td><strong>{slot}</strong></td>
@@ -127,7 +128,8 @@ function StaffTimetable() {
                     const entry = timetableGrid[day][slot];
                     return (
                       <td key={day} style={{
-                        backgroundColor: entry ? 'var(--secondary-teal)' : '#f0f0f0', // Different color for staff timetable
+                        // NEW: Conditional background color based on entry type
+                        backgroundColor: entry ? (entry.type === 'Exam' ? 'var(--error-color)' : entry.type === 'CA' ? 'orange' : 'var(--secondary-teal)') : '#f0f0f0',
                         color: entry ? 'white' : 'var(--text-color-dark)',
                         border: entry ? '1px solid var(--secondary-teal)' : '1px dashed #ccc',
                         padding: '10px',
@@ -138,6 +140,8 @@ function StaffTimetable() {
                         {entry ? (
                           <>
                             <p style={{ fontWeight: 'bold', margin: '0' }}>{getSubjectName(entry.subjectSelect)}</p>
+                            {/* NEW: Display the type of entry */}
+                            <p style={{ fontWeight: 'bold', margin: '5px 0 0', fontSize: '0.9em', fontStyle: 'italic' }}>{entry.type}</p>
                             <small style={{ display: 'block', marginTop: '5px' }}>{entry.classSelect}</small>
                             <small style={{ display: 'block', marginTop: '2px', fontStyle: 'italic' }}>({entry.location})</small>
                           </>
@@ -149,6 +153,7 @@ function StaffTimetable() {
                   })}
                 </tr>
               ))}
+
             </tbody>
           </table>
         </div>

@@ -15,6 +15,7 @@ function StudentResults() {
   // NEW STATE FOR GRADING LOGIC:
   const [totalScore, setTotalScore] = useState(0);
   const [averageScore, setAverageScore] = useState(0);
+  const [gpa, setGpa] = useState(0);
 
   // Effect to check if user is a student
   useEffect(() => {
@@ -31,19 +32,51 @@ function StudentResults() {
     result => result.studentNameSelect === loggedInStudent?.admissionNo && result.status === 'Approved'
   );
 
+  // Helper function to get grade and GPA points from a score
+  const getGradeAndPoints = (score) => {
+    if (score >= 70) return { grade: 'A', points: 5.0 };
+    if (score >= 60) return { grade: 'B', points: 4.0 };
+    if (score >= 50) return { grade: 'C', points: 3.0 };
+    if (score >= 40) return { grade: 'D', points: 2.0 };
+    return { grade: 'F', points: 0.0 };
+  };
+
+  // NEW HELPER FUNCTION to calculate total score and grade from component scores
+  const calculateTotalAndGrade = (firstCa, secondCa, assignment, exam) => {
+    const total = parseFloat(firstCa) + parseFloat(secondCa) + parseFloat(assignment) + parseFloat(exam);
+    let grade = '';
+    if (total >= 70) grade = 'A';
+    else if (total >= 60) grade = 'B';
+    else if (total >= 50) grade = 'C';
+    else if (total >= 40) grade = 'D';
+    else grade = 'F';
+    return { total, grade };
+  };
+
   // NEW EFFECT FOR CALCULATIONS:
   useEffect(() => {
     if (studentSpecificResults.length > 0) {
-      // Calculate total score
-      const total = studentSpecificResults.reduce((sum, result) => sum + result.score, 0);
+      const allFinalScores = studentSpecificResults.map(result => calculateTotalAndGrade(result.firstCaScore, result.secondCaScore, result.assignmentScore, result.examScore).total);
+      
+      const total = allFinalScores.reduce((sum, score) => sum + score, 0);
       setTotalScore(total);
 
-      // Calculate average score
-      const average = total / studentSpecificResults.length;
-      setAverageScore(average.toFixed(2)); // Round to 2 decimal places
+      const average = total / allFinalScores.length;
+      setAverageScore(average.toFixed(2));
+
+      const totalPoints = studentSpecificResults.reduce((sum, result) => {
+        const { total } = calculateTotalAndGrade(result.firstCaScore, result.secondCaScore, result.assignmentScore, result.examScore);
+        const { points } = getGradeAndPoints(total);
+        return sum + points;
+      }, 0);
+      
+      const calculatedGpa = totalPoints / studentSpecificResults.length;
+      setGpa(calculatedGpa.toFixed(2));
+      
     } else {
       setTotalScore(0);
       setAverageScore(0);
+      setGpa(0);
     }
   }, [studentSpecificResults]);
 
@@ -67,7 +100,6 @@ function StudentResults() {
       <h1>My Results</h1>
       <p>Welcome, {loggedInStudent.firstName} {loggedInStudent.lastName}!</p>
       
-      {/* NEW UI SECTION TO DISPLAY STATS */}
       <div className="sub-section" style={{ display: 'flex', justifyContent: 'space-around', marginBottom: '20px' }}>
           <div>
               <h3>Total Score:</h3>
@@ -76,6 +108,10 @@ function StudentResults() {
           <div>
               <h3>Average Score:</h3>
               <p style={{fontSize: '1.5em', fontWeight: 'bold'}}>{averageScore}%</p>
+          </div>
+          <div>
+              <h3>GPA:</h3>
+              <p style={{fontSize: '1.5em', fontWeight: 'bold', color: gpa >= 4.0 ? 'green' : gpa >= 3.0 ? 'orange' : 'red'}}>{gpa}</p>
           </div>
       </div>
       
@@ -87,19 +123,29 @@ function StudentResults() {
               <tr>
                 <th>Subject</th>
                 <th>Term</th>
-                <th>Type</th>
-                <th>Score</th>
+                <th>1st CA (10%)</th>
+                <th>2nd CA (10%)</th>
+                <th>Assignment (20%)</th>
+                <th>Exam (60%)</th>
+                <th>Total (100%)</th>
+                <th>Grade</th>
               </tr>
             </thead>
             <tbody>
-              {studentSpecificResults.map(result => (
+              {studentSpecificResults.map(result => {
+                const { total, grade } = calculateTotalAndGrade(result.firstCaScore, result.secondCaScore, result.assignmentScore, result.examScore);
+                return (
                 <tr key={result.id}>
                   <td>{getSubjectName(result.subjectSelect)}</td>
                   <td>{result.termSelect}</td>
-                  <td>{result.caType}</td>
-                  <td>{result.score}</td>
+                  <td>{result.firstCaScore}</td>
+                  <td>{result.secondCaScore}</td>
+                  <td>{result.assignmentScore}</td>
+                  <td>{result.examScore}</td>
+                  <td><strong>{total}</strong></td>
+                  <td><strong>{grade}</strong></td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>

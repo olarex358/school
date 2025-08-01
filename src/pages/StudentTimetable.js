@@ -117,28 +117,32 @@ function StudentTimetable() {
                   <td><strong>{slot}</strong></td>
                   {daysOfWeek.map(day => {
                     const entry = timetableGrid[day][slot];
-                    return (
-                      <td key={day} style={{
-                        backgroundColor: entry ? 'var(--primary-blue)' : '#f0f0f0',
-                        color: entry ? 'white' : 'var(--text-color-dark)',
-                        border: entry ? '1px solid var(--primary-blue-dark)' : '1px dashed #ccc',
-                        padding: '10px',
-                        textAlign: 'center',
-                        verticalAlign: 'middle',
-                        minWidth: '120px'
-                      }}>
-                        {entry ? (
-                          <>
-                            {/* Correctly using entry.subjectSelect and entry.teacherSelect */}
-                            <p style={{ fontWeight: 'bold', margin: '0' }}>{getSubjectName(entry.subjectSelect)}</p>
-                            <small style={{ display: 'block', marginTop: '5px' }}>{getTeacherName(entry.teacherSelect)}</small>
-                            <small style={{ display: 'block', marginTop: '2px', fontStyle: 'italic' }}>({entry.location})</small>
-                          </>
-                        ) : (
-                          <span style={{ color: '#888' }}>-</span>
-                        )}
-                      </td>
-                    );
+                    // src/pages/StudentTimetable.js (partial view)
+// ...
+return (
+  <td key={day} style={{
+    // NEW: Conditional background color based on entry type
+    backgroundColor: entry ? (entry.type === 'Exam' ? 'var(--error-color)' : entry.type === 'CA' ? 'orange' : 'var(--primary-blue)') : '#f0f0f0',
+    color: entry ? 'white' : 'var(--text-color-dark)',
+    border: entry ? '1px solid var(--primary-blue-dark)' : '1px dashed #ccc',
+    padding: '10px',
+    textAlign: 'center',
+    verticalAlign: 'middle',
+    minWidth: '120px'
+  }}>
+    {entry ? (
+      <>
+        <p style={{ fontWeight: 'bold', margin: '0' }}>{getSubjectName(entry.subjectSelect)}</p>
+        {/* NEW: Display the type of entry */}
+        <p style={{ fontWeight: 'bold', margin: '5px 0 0', fontSize: '0.9em', fontStyle: 'italic' }}>{entry.type}</p>
+        <small style={{ display: 'block', marginTop: '5px' }}>{getTeacherName(entry.teacherSelect)}</small>
+        <small style={{ display: 'block', marginTop: '2px', fontStyle: 'italic' }}>({entry.location})</small>
+      </>
+    ) : (
+      <span style={{ color: '#888' }}>-</span>
+    )}
+  </td>
+);
                   })}
                 </tr>
               ))}
