@@ -1,13 +1,13 @@
 // src/pages/StaffManagement.js
-import React, { useState, useEffect } from 'react'; // Import useEffect for loading subjects/classes
+import React, { useState, useEffect } from 'react';
 import useLocalStorage from '../hooks/useLocalStorage';
 
 function StaffManagement() {
-  const [staffs, setStaffs] = useLocalStorage('schoolPortalStaff', []);
-  // NEW: Load subjects and students to get unique classes for assignment
-  const [subjects] = useLocalStorage('schoolPortalSubjects', []);
-  const [students] = useLocalStorage('schoolPortalStudents', []); // To derive unique classes
-
+  // Update hooks to get data from the backend
+  const [staffs, setStaffs, loadingStaffs] = useLocalStorage('schoolPortalStaff', [], 'http://localhost:5000/api/schoolPortalStaff');
+  const [subjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
+  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
+  
   const [newStaff, setNewStaff] = useState({
     surname: '',
     firstname: '',
@@ -20,23 +20,18 @@ function StaffManagement() {
     contactEmail: '',
     contactPhone: '',
     resumeDocument: '',
-    // NEW: Fields for subject and class assignment
-    assignedSubjects: [], // Array to hold subject codes
-    assignedClasses: []   // Array to hold class names
+    assignedSubjects: [],
+    assignedClasses: []   
   });
-
   const [submitButtonText, setSubmitButtonText] = useState('Add Staff');
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-
   const [formErrors, setFormErrors] = useState({});
   const [message, setMessage] = useState(null);
 
-  // Derive unique classes from existing students for the dropdown
+  // Derived data for form dropdowns
   const uniqueClasses = [...new Set(students.map(s => s.studentClass))].sort();
-  // Derive unique subjects from existing subjects for the dropdown
   const uniqueSubjects = [...new Set(subjects.map(s => s.subjectCode))].sort();
-
 
   const validateField = (name, value) => {
     let error = '';
@@ -73,10 +68,9 @@ function StaffManagement() {
     }
     return error;
   };
-
+  
   const handleChange = (e) => {
     const { id, value, type, files, options, multiple } = e.target;
-
     if (type === 'file') {
       const file = files[0];
       setNewStaff(prevStaff => ({
@@ -88,7 +82,6 @@ function StaffManagement() {
         [id]: ''
       }));
     } else if (multiple) {
-      // Handle multiple select dropdowns
       const selectedValues = Array.from(options)
         .filter(option => option.selected)
         .map(option => option.value);
@@ -98,7 +91,7 @@ function StaffManagement() {
       }));
       setFormErrors(prevErrors => ({
         ...prevErrors,
-        [id]: validateField(id, selectedValues) // Validate array length
+        [id]: validateField(id, selectedValues)
       }));
     }
     else {
@@ -126,7 +119,6 @@ function StaffManagement() {
   const handleSubmit = (e) => {
     e.preventDefault();
     setMessage(null);
-
     let errors = {};
     Object.keys(newStaff).forEach(key => {
       if (key !== 'staffId' && key !== 'resumeDocument') {
@@ -134,8 +126,6 @@ function StaffManagement() {
         if (error) errors[key] = error;
       }
     });
-
-    // Specific validation for assigned subjects/classes if role is Teacher
     if (newStaff.role.includes('Teacher')) {
         if (newStaff.assignedSubjects.length === 0) {
             errors.assignedSubjects = 'Teachers must be assigned at least one subject.';
@@ -144,25 +134,20 @@ function StaffManagement() {
             errors.assignedClasses = 'Teachers must be assigned at least one class.';
         }
     }
-
-
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       setMessage({ type: 'error', text: 'Please correct the errors in the form.' });
       return;
     }
-
     let finalStaffId = newStaff.staffId;
     if (!isEditing) {
       finalStaffId = generateStaffId();
     }
-
     const isDuplicate = staffs.some(s => s.staffId === finalStaffId && s.staffId !== newStaff.staffId);
     if (isDuplicate) {
         setMessage({ type: 'error', text: 'Staff ID already exists. Please use a unique one or edit the existing staff.' });
         return;
     }
-
     if (isEditing) {
       setStaffs(prevStaffs =>
         prevStaffs.map(staff =>
@@ -175,8 +160,6 @@ function StaffManagement() {
       setStaffs(prevStaffs => [...prevStaffs, staffToAdd]);
       setMessage({ type: 'success', text: 'New staff registered successfully!' });
     }
-
-    // Reset form and state after submission
     setNewStaff({
       surname: '',
       firstname: '',
@@ -196,8 +179,7 @@ function StaffManagement() {
     setIsEditing(false);
     setFormErrors({});
   };
-
-  // Function to populate form for editing
+  
   const editStaff = (staffIdToEdit) => {
     const staffToEdit = staffs.find(s => s.staffId === staffIdToEdit);
     if (staffToEdit) {
@@ -208,21 +190,18 @@ function StaffManagement() {
       setMessage(null);
     }
   };
-
-  // Function to delete staff (remains the same)
+  
   const deleteStaff = (staffIdToDelete) => {
     if (window.confirm(`Are you sure you want to delete staff with ID: ${staffIdToDelete}?`)) {
       setStaffs(prevStaffs => prevStaffs.filter(staff => staff.staffId !== staffIdToDelete));
       setMessage({ type: 'success', text: 'Staff deleted successfully!' });
     }
   };
-
-  // Handle search input changes (remains the same)
+  
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
   };
-
-  // Clear search filter and reset form (remains the same)
+  
   const clearSearchAndForm = () => {
     setSearchTerm('');
     setNewStaff({
@@ -245,8 +224,7 @@ function StaffManagement() {
     setFormErrors({});
     setMessage(null);
   };
-
-  // Filter staff based on search term (case-insensitive)
+  
   const filteredStaffs = staffs.filter(staff =>
     staff.firstname.toLowerCase().includes(searchTerm.toLowerCase()) ||
     staff.surname.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -255,11 +233,14 @@ function StaffManagement() {
     staff.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
     staff.contactEmail.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
+  
+  if (loadingStaffs) {
+      return <div className="content-section">Loading staff data...</div>;
+  }
+  
   return (
     <div className="content-section">
       <h2>Staff Management</h2>
-
       <div className="sub-section">
         <h3>{isEditing ? 'Edit Staff' : 'Register/Edit Staff'}</h3>
         {message && (
@@ -316,8 +297,6 @@ function StaffManagement() {
             />
             {formErrors.role && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.role}</p>}
           </div>
-
-          {/* Additional Staff Details */}
           <div style={{ marginBottom: '10px' }}>
             <select
               id="gender"
@@ -393,15 +372,13 @@ function StaffManagement() {
             />
             {formErrors.contactPhone && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.contactPhone}</p>}
           </div>
-
-          {/* NEW: Subject and Class Assignment (Conditional for Teachers) */}
           {newStaff.role.includes('Teacher') && (
             <>
               <div style={{ marginBottom: '10px', flex: '1 1 100%' }}>
                 <label htmlFor="assignedSubjects" style={{ display: 'block', marginBottom: '5px', fontSize: '0.9em', color: '#555' }}>Assigned Subjects (Ctrl+Click to select multiple):</label>
                 <select
                   id="assignedSubjects"
-                  multiple // Enable multiple selection
+                  multiple
                   value={newStaff.assignedSubjects}
                   onChange={handleChange}
                   style={{ width: '100%', padding: '8px', boxSizing: 'border-box', border: formErrors.assignedSubjects ? 'red' : '1px solid #ccc', borderRadius: '4px', minHeight: '80px' }}
@@ -418,12 +395,11 @@ function StaffManagement() {
                 </select>
                 {formErrors.assignedSubjects && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.assignedSubjects}</p>}
               </div>
-
               <div style={{ marginBottom: '10px', flex: '1 1 100%' }}>
                 <label htmlFor="assignedClasses" style={{ display: 'block', marginBottom: '5px', fontSize: '0.9em', color: '#555' }}>Assigned Classes (Ctrl+Click to select multiple):</label>
                 <select
                   id="assignedClasses"
-                  multiple // Enable multiple selection
+                  multiple
                   value={newStaff.assignedClasses}
                   onChange={handleChange}
                   style={{ width: '100%', padding: '8px', boxSizing: 'border-box', border: formErrors.assignedClasses ? 'red' : '1px solid #ccc', borderRadius: '4px', minHeight: '80px' }}
@@ -440,7 +416,6 @@ function StaffManagement() {
               </div>
             </>
           )}
-
           <div style={{ marginBottom: '10px', flex: '1 1 100%' }}>
             <label htmlFor="resumeDocument" style={{ display: 'block', marginBottom: '5px', fontSize: '0.9em', color: '#555' }}>Resume/CV (PDF/Doc/Image):</label>
             <input
@@ -453,12 +428,9 @@ function StaffManagement() {
             {newStaff.resumeDocument && <p style={{ fontSize: '0.8em', color: '#555' }}>Selected: {newStaff.resumeDocument}</p>}
             {formErrors.resumeDocument && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.resumeDocument}</p>}
           </div>
-
-
           <button type="submit">{submitButtonText}</button>
         </form>
       </div>
-
       <div className="sub-section">
         <h3>All Staff</h3>
         <input
@@ -466,7 +438,8 @@ function StaffManagement() {
           id="staffSearchFilter"
           placeholder="Search by Name, ID or Role"
           value={searchTerm}
-          onChange={handleSearchChange}/>
+          onChange={handleSearchChange}
+        />
         <button onClick={clearSearchAndForm}>Clear Filter / Reset Form</button>
         <div className="table-container">
             <table id="staffTable">
@@ -479,8 +452,8 @@ function StaffManagement() {
                         <th>Email</th>
                         <th>Phone</th>
                         <th>Qualifications</th>
-                        <th>Subjects</th> {/* NEW COLUMN */}
-                        <th>Classes</th> {/* NEW COLUMN */}
+                        <th>Subjects</th>
+                        <th>Classes</th>
                         <th>Resume</th>
                         <th>Actions</th>
                     </tr>
@@ -496,8 +469,8 @@ function StaffManagement() {
                         <td>{staff.contactEmail}</td>
                         <td>{staff.contactPhone}</td>
                         <td>{staff.qualifications}</td>
-                        <td>{staff.assignedSubjects && staff.assignedSubjects.length > 0 ? staff.assignedSubjects.join(', ') : 'N/A'}</td> {/* Display NEW COLUMN */}
-                        <td>{staff.assignedClasses && staff.assignedClasses.length > 0 ? staff.assignedClasses.join(', ') : 'N/A'}</td> {/* Display NEW COLUMN */}
+                        <td>{staff.assignedSubjects && staff.assignedSubjects.length > 0 ? staff.assignedSubjects.join(', ') : 'N/A'}</td>
+                        <td>{staff.assignedClasses && staff.assignedClasses.length > 0 ? staff.assignedClasses.join(', ') : 'N/A'}</td>
                         <td>{staff.resumeDocument ? <a href="#" onClick={(e) => { e.preventDefault(); alert(`Simulating download of: ${staff.resumeDocument}`); }}>{staff.resumeDocument}</a> : 'N/A'}</td>
                         <td>
                         <button
@@ -515,7 +488,7 @@ function StaffManagement() {
                     ))
                 ) : (
                     <tr>
-                    <td colSpan="11">No staff found.</td> {/* Adjusted colspan */}
+                    <td colSpan="11">No staff found.</td>
                     </tr>
                 )}
                 </tbody>

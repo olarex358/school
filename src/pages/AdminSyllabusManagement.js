@@ -7,28 +7,26 @@ function AdminSyllabusManagement() {
   const navigate = useNavigate();
   const [loggedInAdmin, setLoggedInAdmin] = useState(null);
 
-  const [syllabusEntries, setSyllabusEntries] = useLocalStorage('schoolPortalSyllabusEntries', []);
+  // Update hooks to get data from the backend
+  const [syllabusEntries, setSyllabusEntries, loadingSyllabus] = useLocalStorage('schoolPortalSyllabusEntries', [], 'http://localhost:5000/api/schoolPortalSyllabusEntries');
+  const [subjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/subjects');
+  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/students');
 
   const [syllabusForm, setSyllabusForm] = useState({
-    title: '', // e.g., 'JSS1 First Term Syllabus'
+    title: '',
     description: '',
-    applicableClass: '', // 'JSS1', 'SS1', 'all', etc.
-    applicableSubject: '', // 'MATH101', 'ENG101', 'all', etc.
-    audience: 'all' // 'all', 'students', 'staff'
+    applicableClass: '',
+    applicableSubject: '',
+    audience: 'all'
   });
-
   const [formErrors, setFormErrors] = useState({});
   const [message, setMessage] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editSyllabusId, setEditSyllabusId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Load subjects and students to derive classes
-  const [subjects] = useLocalStorage('schoolPortalSubjects', []);
-  const [students] = useLocalStorage('schoolPortalStudents', []);
   const uniqueClasses = [...new Set(students.map(s => s.studentClass))].sort();
   const uniqueSubjects = [...new Set(subjects.map(s => s.subjectCode))].sort();
-
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('loggedInUser'));
@@ -60,18 +58,15 @@ function AdminSyllabusManagement() {
   const handleSubmit = (e) => {
     e.preventDefault();
     setMessage(null);
-
     if (!validateForm()) {
       setMessage({ type: 'error', text: 'Please correct the errors in the form.' });
       return;
     }
-
     const syllabusToAddOrUpdate = {
       ...syllabusForm,
-      id: isEditing ? editSyllabusId : Date.now(), // Use existing ID or generate new
+      id: isEditing ? editSyllabusId : Date.now(),
       timestamp: new Date().toISOString()
     };
-
     if (isEditing) {
       setSyllabusEntries(prevEntries =>
         prevEntries.map(entry =>
@@ -83,8 +78,6 @@ function AdminSyllabusManagement() {
       setSyllabusEntries(prevEntries => [...prevEntries, syllabusToAddOrUpdate]);
       setMessage({ type: 'success', text: 'Syllabus entry added successfully!' });
     }
-
-    // Reset form
     setSyllabusForm({ title: '', description: '', applicableClass: '', applicableSubject: '', audience: 'all' });
     setIsEditing(false);
     setEditSyllabusId(null);
@@ -133,10 +126,13 @@ function AdminSyllabusManagement() {
     return <div className="content-section">Access Denied. Please log in as an Admin.</div>;
   }
 
+  if (loadingSyllabus) {
+    return <div className="content-section">Loading syllabus data...</div>;
+  }
+
   return (
     <div className="content-section">
       <h1>Syllabus Management</h1>
-
       <div className="sub-section">
         <h2>{isEditing ? 'Edit Syllabus Entry' : 'Add New Syllabus Entry'}</h2>
         {message && (
@@ -157,7 +153,6 @@ function AdminSyllabusManagement() {
             />
             {formErrors.title && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.title}</p>}
           </div>
-
           <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
             <label htmlFor="applicableClass" style={{ display: 'block', marginBottom: '5px' }}>Applicable Class:</label>
             <select
@@ -175,7 +170,6 @@ function AdminSyllabusManagement() {
             </select>
             {formErrors.applicableClass && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.applicableClass}</p>}
           </div>
-
           <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
             <label htmlFor="applicableSubject" style={{ display: 'block', marginBottom: '5px' }}>Applicable Subject:</label>
             <select
@@ -193,7 +187,6 @@ function AdminSyllabusManagement() {
             </select>
             {formErrors.applicableSubject && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.applicableSubject}</p>}
           </div>
-
           <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
             <label htmlFor="audience" style={{ display: 'block', marginBottom: '5px' }}>Audience:</label>
             <select
@@ -209,7 +202,6 @@ function AdminSyllabusManagement() {
             </select>
             {formErrors.audience && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.audience}</p>}
           </div>
-
           <div style={{ marginBottom: '10px', flex: '1 1 100%' }}>
             <label htmlFor="description" style={{ display: 'block', marginBottom: '5px' }}>Description / Content:</label>
             <textarea
@@ -222,12 +214,10 @@ function AdminSyllabusManagement() {
             ></textarea>
             {formErrors.description && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.description}</p>}
           </div>
-
           <button type="submit" style={{ flex: '1 1 calc(50% - 7.5px)' }}>{isEditing ? 'Update Syllabus' : 'Add Syllabus'}</button>
           <button type="button" onClick={clearForm} style={{ flex: '1 1 calc(50% - 7.5px)', backgroundColor: '#6c757d', borderColor: '#6c757d' }}>Clear Form</button>
         </form>
       </div>
-
       <div className="sub-section">
         <h2>All Syllabus Entries</h2>
         <input
@@ -257,7 +247,7 @@ function AdminSyllabusManagement() {
                     <td>{entry.applicableClass.charAt(0).toUpperCase() + entry.applicableClass.slice(1)}</td>
                     <td>{getSubjectName(entry.applicableSubject)}</td>
                     <td>{entry.audience.charAt(0).toUpperCase() + entry.audience.slice(1)}</td>
-                    <td>{entry.description.substring(0, 100)}...</td> {/* Show snippet */}
+                    <td>{entry.description.substring(0, 100)}...</td>
                     <td>
                       <button className="action-btn edit-btn" onClick={() => editSyllabus(entry.id)}>Edit</button>
                       <button className="action-btn delete-btn" onClick={() => deleteSyllabus(entry.id)}>Delete</button>

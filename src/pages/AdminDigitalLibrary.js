@@ -7,17 +7,16 @@ function AdminDigitalLibrary() {
   const navigate = useNavigate();
   const [loggedInAdmin, setLoggedInAdmin] = useState(null);
 
-  // Data from localStorage
-  const [digitalResources, setDigitalResources] = useLocalStorage('schoolPortalDigitalLibrary', []);
-  const [students] = useLocalStorage('schoolPortalStudents', []); // To get unique classes
+  // Update hooks to get data from the backend
+  const [digitalResources, setDigitalResources, loadingResources] = useLocalStorage('schoolPortalDigitalLibrary', [], 'http://localhost:5000/api/schoolPortalDigitalLibrary');
+  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
 
-  // Form states
   const [resourceForm, setResourceForm] = useState({
     title: '',
     description: '',
-    audience: 'all', // 'all', 'students', 'staff'
-    applicableClass: 'all', // 'all', 'JSS1', etc.
-    filename: '' // Simulated file upload
+    audience: 'all',
+    applicableClass: 'all',
+    filename: ''
   });
 
   const [formErrors, setFormErrors] = useState({});
@@ -36,7 +35,6 @@ function AdminDigitalLibrary() {
     }
   }, [navigate]);
 
-  // Derived data for dropdowns
   const uniqueClasses = ['all', ...new Set(students.map(s => s.studentClass))].sort();
 
   const validateForm = () => {
@@ -69,19 +67,15 @@ function AdminDigitalLibrary() {
   const handleSubmit = (e) => {
     e.preventDefault();
     setMessage(null);
-
     if (!validateForm()) {
       setMessage({ type: 'error', text: 'Please correct the errors in the form.' });
       return;
     }
-
     const resourceToAddOrUpdate = {
       ...resourceForm,
       id: isEditing ? editResourceId : Date.now(),
       timestamp: new Date().toISOString(),
-      // In a real app, you would handle file upload here and store a URL
     };
-    
     if (isEditing) {
       setDigitalResources(prev =>
         prev.map(res => (res.id === editResourceId ? resourceToAddOrUpdate : res))
@@ -91,8 +85,6 @@ function AdminDigitalLibrary() {
       setDigitalResources(prev => [...prev, resourceToAddOrUpdate]);
       setMessage({ type: 'success', text: 'New resource added successfully!' });
     }
-
-    // Reset form
     setResourceForm({
       title: '',
       description: '',
@@ -141,10 +133,14 @@ function AdminDigitalLibrary() {
     res.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     res.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
     res.filename.toLowerCase().includes(searchTerm.toLowerCase())
-  ).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)); // Sort by newest first
+  ).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   
   if (!loggedInAdmin) {
     return <div className="content-section">Access Denied. Please log in as an Admin.</div>;
+  }
+
+  if (loadingResources) {
+    return <div className="content-section">Loading resources data...</div>;
   }
 
   return (
@@ -171,7 +167,6 @@ function AdminDigitalLibrary() {
             />
             {formErrors.title && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.title}</p>}
           </div>
-
           <div style={{ marginBottom: '10px' }}>
             <label htmlFor="description" style={{ display: 'block', marginBottom: '5px' }}>Description:</label>
             <textarea
@@ -185,7 +180,6 @@ function AdminDigitalLibrary() {
             ></textarea>
             {formErrors.description && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.description}</p>}
           </div>
-
           <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
             <label htmlFor="audience" style={{ display: 'block', marginBottom: '5px' }}>Audience:</label>
             <select
@@ -201,7 +195,6 @@ function AdminDigitalLibrary() {
             </select>
             {formErrors.audience && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.audience}</p>}
           </div>
-
           <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
             <label htmlFor="applicableClass" style={{ display: 'block', marginBottom: '5px' }}>Applicable Class:</label>
             <select
@@ -218,7 +211,6 @@ function AdminDigitalLibrary() {
             </select>
             {formErrors.applicableClass && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.applicableClass}</p>}
           </div>
-
           <div style={{ marginBottom: '10px', flex: '1 1 100%' }}>
             <label htmlFor="file" style={{ display: 'block', marginBottom: '5px' }}>File Upload (Simulated):</label>
             <input
@@ -226,17 +218,15 @@ function AdminDigitalLibrary() {
               id="filename"
               onChange={handleChange}
               style={{ borderColor: formErrors.filename ? 'red' : '' }}
-              disabled={isEditing} // Cannot change file on edit
+              disabled={isEditing}
             />
             {formErrors.filename && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.filename}</p>}
             {resourceForm.filename && <small>File selected: {resourceForm.filename}</small>}
           </div>
-
           <button type="submit">{isEditing ? 'Update Resource' : 'Add Resource'}</button>
           <button type="button" onClick={clearForm} style={{ backgroundColor: '#6c757d', borderColor: '#6c757d' }}>Clear Form</button>
         </form>
       </div>
-
       <div className="sub-section">
         <h2>All Digital Resources</h2>
         <input

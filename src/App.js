@@ -108,36 +108,15 @@ function App() {
   return (
     <div className="App">
       <Header /> {/* Always render Header */}
-
-      <main style={{ flexGrow: 1, padding: '20px' }}>
+<main style={{ flexGrow: 1, padding: '20px' }}>
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/home" element={
-            // If logged in and at /home, redirect to dashboard. Otherwise show HomePage.
-            loggedInUser ? (
-                loggedInUser.type === 'admin' ? <Navigate to="/dashboard" replace /> :
-                loggedInUser.type === 'student' ? <Navigate to="/student-dashboard" replace /> :
-                loggedInUser.type === 'staff' ? <Navigate to="/staff-dashboard" replace /> :
-                <HomePage /> // Fallback if type is unknown but logged in
-            ) : (
-                <HomePage /> // If not logged in, show HomePage
-            )
-          } />
+          <Route path="/home" element={<HomePage />} />
+          {/* Default / route now always shows HomePage */}
+          <Route path="/" element={<HomePage />} />
 
-          {/* Default / route: Redirects to appropriate dashboard if logged in, otherwise to HomePage */}
-          <Route path="/" element={
-            loggedInUser ? (
-              loggedInUser.type === 'admin' ? <Navigate to="/dashboard" replace /> :
-              loggedInUser.type === 'student' ? <Navigate to="/student-dashboard" replace /> :
-              loggedInUser.type === 'staff' ? <Navigate to="/staff-dashboard" replace /> :
-              <Navigate to="/login" replace /> // Fallback for unknown type or corrupted data
-            ) : (
-              <HomePage /> // If NOT logged in, render HomePage
-            )
-          } />
-
-            {/* Admin Protected Routes */}
+          {/* Admin Protected Routes */}
           <Route path="/dashboard" element={<ProtectedRoute allowedTypes={['admin']}><Dashboard /></ProtectedRoute>} />
           <Route path="/student-management" element={<ProtectedRoute allowedTypes={['admin']}><StudentManagement /></ProtectedRoute>} />
           <Route path="/staff-management" element={<ProtectedRoute allowedTypes={['admin']}><StaffManagement /></ProtectedRoute>} />
@@ -154,7 +133,6 @@ function App() {
           <Route path="/admin-digital-library" element={<ProtectedRoute allowedTypes={['admin']}><AdminDigitalLibrary /></ProtectedRoute>} />
           <Route path="/admin-certification-management" element={<ProtectedRoute allowedTypes={['admin']}><AdminCertificationManagement /></ProtectedRoute>} />
 
-
           {/* Student Protected Routes */}
           <Route path="/student-dashboard" element={<ProtectedRoute allowedTypes={['student']}><StudentDashboard /></ProtectedRoute>} />
           <Route path="/student-profile" element={<ProtectedRoute allowedTypes={['student']}><StudentProfile /></ProtectedRoute>} />
@@ -170,6 +148,7 @@ function App() {
           <Route path='/student-timetable' element={<ProtectedRoute allowedTypes={['student']}><StudentTimetable /></ProtectedRoute>} />
           <Route path='/student-digital-library' element={<ProtectedRoute allowedTypes={['student']}><UserDigitalLibrary /></ProtectedRoute>} />
           <Route path='/student-certification-registration' element={<ProtectedRoute allowedTypes={['student']}><StudentCertificationRegistration /></ProtectedRoute>} />
+
           {/* Staff Protected Routes */}
           <Route path="/staff-dashboard" element={<ProtectedRoute allowedTypes={['staff']}><StaffDashboard/></ProtectedRoute>} />
           <Route path="/staff-profile" element={<ProtectedRoute allowedTypes={['staff']}><StaffProfile /></ProtectedRoute>} />
@@ -182,11 +161,12 @@ function App() {
           <Route path="/view-reports" element={<ProtectedRoute allowedTypes={['admin', 'staff']}><ViewReports /></ProtectedRoute>} />
           <Route path="/staff-timetable" element={<ProtectedRoute allowedTypes={['staff']}><StaffTimetable /></ProtectedRoute>} />
           <Route path="/staff-digital-library" element={<ProtectedRoute allowedTypes={['staff']}><UserDigitalLibrary /></ProtectedRoute>} />
-          {/* Public Calendar Route */}
+
           {/* Catch-all route for 404 pages */}
           <Route path="*" element={<h2>404 - Page Not Found</h2>} />
         </Routes>
       </main>
+
       <Footer /> {/* Always render Footer */}
     </div>
   );

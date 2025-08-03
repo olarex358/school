@@ -2,21 +2,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useLocalStorage from '../hooks/useLocalStorage';
-import { Link } from 'react-router-dom';
 
 function AdminCalendarManagement() {
   const navigate = useNavigate();
   const [loggedInAdmin, setLoggedInAdmin] = useState(null);
 
-  const [calendarEvents, setCalendarEvents] = useLocalStorage('schoolPortalCalendarEvents', []);
+  // Update hook to get data from the backend
+  const [calendarEvents, setCalendarEvents, loadingEvents] = useLocalStorage('schoolPortalCalendarEvents', [], 'http://localhost:5000/api/schoolPortalCalendarEvents');
 
   const [eventForm, setEventForm] = useState({
     title: '',
     date: '',
     description: '',
-    audience: 'all' // 'all', 'students', 'staff'
+    audience: 'all'
   });
-
   const [formErrors, setFormErrors] = useState({});
   const [message, setMessage] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -52,18 +51,15 @@ function AdminCalendarManagement() {
   const handleSubmit = (e) => {
     e.preventDefault();
     setMessage(null);
-
     if (!validateForm()) {
       setMessage({ type: 'error', text: 'Please correct the errors in the form.' });
       return;
     }
-
     const eventToAddOrUpdate = {
       ...eventForm,
-      id: isEditing ? editEventId : Date.now(), // Use existing ID or generate new
+      id: isEditing ? editEventId : Date.now(),
       timestamp: new Date().toISOString()
     };
-
     if (isEditing) {
       setCalendarEvents(prevEvents =>
         prevEvents.map(event =>
@@ -75,8 +71,6 @@ function AdminCalendarManagement() {
       setCalendarEvents(prevEvents => [...prevEvents, eventToAddOrUpdate]);
       setMessage({ type: 'success', text: 'Calendar event added successfully!' });
     }
-
-    // Reset form
     setEventForm({ title: '', date: '', description: '', audience: 'all' });
     setIsEditing(false);
     setEditEventId(null);
@@ -119,10 +113,13 @@ function AdminCalendarManagement() {
     return <div className="content-section">Access Denied. Please log in as an Admin.</div>;
   }
 
+  if (loadingEvents) {
+    return <div className="content-section">Loading calendar events...</div>;
+  }
+
   return (
     <div className="content-section">
       <h1>Calendar Management</h1>
-
       <div className="sub-section">
         <h2>{isEditing ? 'Edit Calendar Event' : 'Add New Calendar Event'}</h2>
         {message && (
@@ -143,7 +140,6 @@ function AdminCalendarManagement() {
             />
             {formErrors.title && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.title}</p>}
           </div>
-
           <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
             <label htmlFor="date" style={{ display: 'block', marginBottom: '5px' }}>Date:</label>
             <input
@@ -156,7 +152,6 @@ function AdminCalendarManagement() {
             />
             {formErrors.date && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.date}</p>}
           </div>
-
           <div style={{ marginBottom: '10px', flex: '1 1 100%' }}>
             <label htmlFor="description" style={{ display: 'block', marginBottom: '5px' }}>Description:</label>
             <textarea
@@ -169,7 +164,6 @@ function AdminCalendarManagement() {
             ></textarea>
             {formErrors.description && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.description}</p>}
           </div>
-
           <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
             <label htmlFor="audience" style={{ display: 'block', marginBottom: '5px' }}>Audience:</label>
             <select
@@ -185,12 +179,10 @@ function AdminCalendarManagement() {
             </select>
             {formErrors.audience && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.audience}</p>}
           </div>
-
           <button type="submit" style={{ flex: '1 1 calc(50% - 7.5px)' }}>{isEditing ? 'Update Event' : 'Add Event'}</button>
-          <button type="button" onClick={clearForm} style={{ flex: '1 1 calc(50% - 7.5px)', backgroundColor: '#6c757d', borderColor: '#6c757d' }}>Clear Form </button>
+          <button type="button" onClick={clearForm} style={{ flex: '1 1 calc(50% - 7.5px)', backgroundColor: '#6c757d', borderColor: '#6c757d' }}>Clear Form</button>
         </form>
       </div>
-
       <div className="sub-section">
         <h2>All Calendar Events</h2>
         <input
@@ -200,13 +192,6 @@ function AdminCalendarManagement() {
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{ width: '100%', padding: '8px', marginBottom: '15px' }}
         />
-        <div style={{ marginBottom: '15px' }}>
-            <Link to="/public-calendar" style={{ textDecoration: 'none' }}>
-                <button type="button" style={{ backgroundColor: 'var(--primary-blue-dark)', borderColor: 'var(--primary-blue-dark)' }}>
-                    View Public Calendar
-                </button>
-            </Link>
-        </div>
         <div className="table-container">
           <table>
             <thead>
@@ -221,10 +206,11 @@ function AdminCalendarManagement() {
             <tbody>
               {filteredEvents.length > 0 ? (
                 filteredEvents.map(event => (
-                  <tr key={event.id}><td>{event.title}</td>
+                  <tr key={event.id}>
+                    <td>{event.title}</td>
                     <td>{event.date}</td>
                     <td>{event.description}</td>
-                    <td>{event.audience.charAt(0).toUpperCase() + event.audience.slice(1)}</td> 
+                    <td>{event.audience.charAt(0).toUpperCase() + event.audience.slice(1)}</td>
                     <td>
                       <button className="action-btn edit-btn" onClick={() => editEvent(event.id)}>Edit</button>
                       <button className="action-btn delete-btn" onClick={() => deleteEvent(event.id)}>Delete</button>

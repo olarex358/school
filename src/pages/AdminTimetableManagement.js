@@ -1,4 +1,4 @@
-// src/pages/AdminTimetableManagement.js (Complete code as provided previously)
+// src/pages/AdminTimetableManagement.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useLocalStorage from '../hooks/useLocalStorage';
@@ -7,23 +7,21 @@ function AdminTimetableManagement() {
   const navigate = useNavigate();
   const [loggedInAdmin, setLoggedInAdmin] = useState(null);
 
-  // Data from localStorage
-  // ENSURE THIS IS PLURAL: 'schoolPortalTimetables'
-  const [timetableEntries, setTimetableEntries] = useLocalStorage('schoolPortalTimetables', []);
-  const [students] = useLocalStorage('schoolPortalStudents', []); // To get unique classes
-  const [subjects] = useLocalStorage('schoolPortalSubjects', []);
-  const [staffs] = useLocalStorage('schoolPortalStaff', []); // To get teachers
+  // Update hooks to get data from the backend
+  const [timetableEntries, setTimetableEntries, loadingTimetable] = useLocalStorage('schoolPortalTimetables', [], 'http://localhost:5000/api/schoolPortalTimetables');
+  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
+  const [subjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
+  const [staffs] = useLocalStorage('schoolPortalStaff', [], 'http://localhost:5000/api/schoolPortalStaff');
 
-  // Form states
   const [timetableForm, setTimetableForm] = useState({
     classSelect: '',
     subjectSelect: '',
-    teacherSelect: '', // staffId of the teacher
+    teacherSelect: '',
     day: '',
     startTime: '',
     endTime: '',
     location: '',
-    type:'',
+    type: 'Class'
   });
 
   const [formErrors, setFormErrors] = useState({});
@@ -44,11 +42,10 @@ function AdminTimetableManagement() {
 
   // Derived data for dropdowns
   const uniqueClasses = [...new Set(students.map(s => s.studentClass))].sort();
-  const availableTeachers = staffs.filter(s => s.role.includes('Teacher')); // Only show staff with 'Teacher' role
+  const availableTeachers = staffs.filter(s => s.role.includes('Teacher'));
   const uniqueSubjects = [...new Set(subjects.map(s => s.subjectCode))].sort();
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-  // Helper functions
   const getTeacherName = (staffId) => {
     const teacher = staffs.find(s => s.staffId === staffId);
     return teacher ? `${teacher.firstname} ${teacher.surname} (${teacher.staffId})` : 'Unknown Teacher';
@@ -68,7 +65,6 @@ function AdminTimetableManagement() {
     if (!timetableForm.startTime) errors.startTime = 'Start time is required.';
     if (!timetableForm.endTime) errors.endTime = 'End time is required.';
     if (!timetableForm.location.trim()) errors.location = 'Location is required.';
-
     if (timetableForm.startTime && timetableForm.endTime) {
       if (timetableForm.startTime >= timetableForm.endTime) {
         errors.endTime = 'End time must be after start time.';
@@ -81,40 +77,34 @@ function AdminTimetableManagement() {
   const handleChange = (e) => {
     const { id, value } = e.target;
     setTimetableForm(prev => ({ ...prev, [id]: value }));
-    setFormErrors(prev => ({ ...prev, [id]: '' })); // Clear error on change
+    setFormErrors(prev => ({ ...prev, [id]: '' }));
     setMessage(null);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setMessage(null);
-
     if (!validateForm()) {
       setMessage({ type: 'error', text: 'Please correct the errors in the form.' });
       return;
     }
-
     const entryToAddOrUpdate = {
       ...timetableForm,
-      id: isEditing ? editEntryId : Date.now(), // Use existing ID or generate new
+      id: isEditing ? editEntryId : Date.now(),
       timestamp: new Date().toISOString()
     };
-
-    // Check for overlaps for the same class and day
     const isOverlap = timetableEntries.some(entry =>
-      entry.id !== entryToAddOrUpdate.id && // Don't check against itself during edit
+      entry.id !== entryToAddOrUpdate.id &&
       entry.classSelect === entryToAddOrUpdate.classSelect &&
       entry.day === entryToAddOrUpdate.day &&
       (
         (entryToAddOrUpdate.startTime < entry.endTime && entryToAddOrUpdate.endTime > entry.startTime)
       )
     );
-
     if (isOverlap) {
       setMessage({ type: 'error', text: 'This timetable entry overlaps with an existing entry for the same class and day. Please adjust times.' });
       return;
     }
-
     if (isEditing) {
       setTimetableEntries(prevEntries =>
         prevEntries.map(entry =>
@@ -126,8 +116,6 @@ function AdminTimetableManagement() {
       setTimetableEntries(prevEntries => [...prevEntries, entryToAddOrUpdate]);
       setMessage({ type: 'success', text: 'New timetable entry added successfully!' });
     }
-
-    // Reset form
     setTimetableForm({
       classSelect: '',
       subjectSelect: '',
@@ -136,6 +124,7 @@ function AdminTimetableManagement() {
       startTime: '',
       endTime: '',
       location: '',
+      type: 'Class'
     });
     setIsEditing(false);
     setEditEntryId(null);
@@ -169,6 +158,7 @@ function AdminTimetableManagement() {
       startTime: '',
       endTime: '',
       location: '',
+      type: 'Class'
     });
     setIsEditing(false);
     setEditEntryId(null);
@@ -181,9 +171,9 @@ function AdminTimetableManagement() {
     getSubjectName(entry.subjectSelect).toLowerCase().includes(searchTerm.toLowerCase()) ||
     getTeacherName(entry.teacherSelect).toLowerCase().includes(searchTerm.toLowerCase()) ||
     entry.day.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    entry.location.toLowerCase().includes(searchTerm.toLowerCase())
+    entry.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    entry.type.toLowerCase().includes(searchTerm.toLowerCase())
   ).sort((a, b) => {
-    // Sort by day of week, then by class, then by start time
     const dayOrder = daysOfWeek.indexOf(a.day) - daysOfWeek.indexOf(b.day);
     if (dayOrder !== 0) return dayOrder;
     const classOrder = a.classSelect.localeCompare(b.classSelect);
@@ -193,6 +183,10 @@ function AdminTimetableManagement() {
   
   if (!loggedInAdmin) {
     return <div className="content-section">Access Denied. Please log in as an Admin.</div>;
+  }
+
+  if (loadingTimetable) {
+    return <div className="content-section">Loading timetable data...</div>;
   }
 
   return (
@@ -223,21 +217,7 @@ function AdminTimetableManagement() {
             </select>
             {formErrors.classSelect && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.classSelect}</p>}
           </div>
-               <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
-        <label htmlFor="type" style={{ display: 'block', marginBottom: '5px' }}>Entry Type:</label>
-        <select
-          id="type"
-          value={timetableForm.type}
-          onChange={handleChange}
-          required
-          style={{ borderColor: formErrors.type ? 'red' : '' }}
-        >
-          <option value="Class">Class</option>
-          <option value="Exam">Exam</option>
-          <option value="CA">CA</option>
-        </select>
-        {formErrors.type && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.type}</p>}
-      </div>
+
           <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
             <label htmlFor="subjectSelect" style={{ display: 'block', marginBottom: '5px' }}>Subject:</label>
             <select
@@ -272,6 +252,22 @@ function AdminTimetableManagement() {
               {availableTeachers.length === 0 && <option value="" disabled>No teachers available. Add staff with 'Teacher' role.</option>}
             </select>
             {formErrors.teacherSelect && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.teacherSelect}</p>}
+          </div>
+          
+          <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
+            <label htmlFor="type" style={{ display: 'block', marginBottom: '5px' }}>Entry Type:</label>
+            <select
+              id="type"
+              value={timetableForm.type}
+              onChange={handleChange}
+              required
+              style={{ borderColor: formErrors.type ? 'red' : '' }}
+            >
+              <option value="Class">Class</option>
+              <option value="Exam">Exam</option>
+              <option value="CA">CA</option>
+            </select>
+            {formErrors.type && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.type}</p>}
           </div>
 
           <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
@@ -366,7 +362,7 @@ function AdminTimetableManagement() {
                     <td>{entry.classSelect}</td>
                     <td>{getSubjectName(entry.subjectSelect)}</td>
                     <td>{getTeacherName(entry.teacherSelect)}</td>
-                   <td>{entry.type}</td>
+                    <td>{entry.type}</td>
                     <td>{entry.day}</td>
                     <td>{`${entry.startTime} - ${entry.endTime}`}</td>
                     <td>{entry.location}</td>
@@ -378,7 +374,7 @@ function AdminTimetableManagement() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7">No timetable entries found.</td>
+                  <td colSpan="8">No timetable entries found.</td>
                 </tr>
               )}
             </tbody>

@@ -1,8 +1,9 @@
 // src/pages/LoginPage.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import useLocalStorage from '../hooks/useLocalStorage'; // Import custom hook
-import logo from './logo.png'; //
+// The useLocalStorage hook is no longer needed for login logic itself, but we'll keep the import for now if other parts of the file use it.
+import useLocalStorage from '../hooks/useLocalStorage';
+import logo from './logo.png';
 
 function LoginPage() {
   const [username, setUsername] = useState('');
@@ -13,65 +14,52 @@ function LoginPage() {
   // Load all relevant user data from localStorage using our custom hook
   const [adminUsers] = useLocalStorage('schoolPortalUsers', []);
   const [students] = useLocalStorage('schoolPortalStudents', []);
-  const [staffs] = useLocalStorage('schoolPortalStaff', []); // Load staff data
+  const [staffs] = useLocalStorage('schoolPortalStaff', []);
 
   useEffect(() => {
     setError('');
   }, []);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
 
-    const trimmedUsername = username.trim();
-    const trimmedPassword = password.trim();
+    try {
+      // Send login data to our backend API
+      const response = await fetch('http://localhost:5000/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
 
-    let loggedInUser = null;
-    let userType = null;
+      if (response.ok) {
+        const data = await response.json();
+        const user = data.user;
+        
+        // Determine the user type from the backend response
+        let userType = user.type;
 
-    // 1. Try to authenticate as an Admin User
-    const foundAdmin = adminUsers.find(
-      user => user.username === trimmedUsername && user.password === trimmedPassword
-    );
-    if (foundAdmin) {
-      loggedInUser = foundAdmin;
-      userType = 'admin';
-    }
-
-    // 2. Try to authenticate as a Staff User
-    // Note: StaffManagement uses staffId, surname, firstname, role.
-    // For login, we'll use staffId as username and a default '1234' password for demo
-    const foundStaff = staffs.find(
-        staff => staff.staffId === trimmedUsername && '1234' === trimmedPassword // Assuming staffId as username, '1234' as demo password
-    );
-    if (!loggedInUser && foundStaff) { // Only check if no admin match yet
-      loggedInUser = foundStaff;
-      userType = 'staff';
-    }
-
-    // 3. Try to authenticate as a Student
-    // Note: StudentManagement uses admissionNo, firstName, lastName, dob, etc.
-    // For login, we'll use admissionNo as username and a default '1234' password for demo.
-    const foundStudent = students.find(
-        student => student.admissionNo === trimmedUsername && '1234' === trimmedPassword // Assuming admissionNo as username, '1234' as demo password
-    );
-    if (!loggedInUser && foundStudent) { // Only check if no admin/staff match yet
-      loggedInUser = foundStudent;
-      userType = 'student';
-    }
-
-    if (loggedInUser) {
-      localStorage.setItem('loggedInUser', JSON.stringify({ ...loggedInUser, type: userType }));
-
-      if (userType === 'admin') {
-        navigate('/dashboard'); // Admin Dashboard
-      } else if (userType === 'student') {
-        navigate('/student-dashboard'); // Student Dashboard
-      } else if (userType === 'staff') {
-        navigate('/staff-dashboard'); // Staff Dashboard
+        // Store user data in localStorage, just as a flag for the frontend
+        localStorage.setItem('loggedInUser', JSON.stringify({ ...user, type: userType }));
+        
+        // Redirect to the appropriate dashboard based on user type from backend
+        if (userType === 'admin') {
+          navigate('/dashboard');
+        } else if (userType === 'student') {
+          navigate('/student-dashboard');
+        } else if (userType === 'staff') {
+          navigate('/staff-dashboard');
+        }
+      } else {
+        // Handle failed login
+        const errorData = await response.json();
+        setError(errorData.message || 'Login failed.');
       }
-    } else {
-      setError('Invalid username or password.');
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('An error occurred. Please try again.');
     }
   };
 
@@ -88,7 +76,7 @@ function LoginPage() {
             className="addmin"
             type="text"
             id="username"
-            placeholder="Admission No. / Staff ID / Username" // Updated for unified
+            placeholder="Username (e.g., admin, student1, staff1)"
             required
             value={username}
             onChange={(e) => setUsername(e.target.value)}
@@ -97,7 +85,7 @@ function LoginPage() {
             className="Password"
             type="password"
             id="password"
-            placeholder="Password"
+            placeholder="Password (e.g., 123)"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}

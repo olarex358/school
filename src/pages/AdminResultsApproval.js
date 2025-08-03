@@ -7,14 +7,13 @@ function AdminResultsApproval() {
   const navigate = useNavigate();
   const [loggedInAdmin, setLoggedInAdmin] = useState(null);
 
-  // Data from localStorage
-  const [pendingResults, setPendingResults] = useLocalStorage('schoolPortalPendingResults', []);
-  const [approvedResults, setApprovedResults] = useLocalStorage('schoolPortalResults', []);
-  const [students] = useLocalStorage('schoolPortalStudents', []);
-  const [subjects] = useLocalStorage('schoolPortalSubjects', []);
-  const [staffs] = useLocalStorage('schoolPortalStaff', []); // To get teacher name
+  // Update hooks to get data from the backend
+  const [pendingResults, setPendingResults, loadingPending] = useLocalStorage('schoolPortalPendingResults', [], 'http://localhost:5000/api/schoolPortalPendingResults');
+  const [approvedResults, setApprovedResults, loadingApproved] = useLocalStorage('schoolPortalResults', [], 'http://localhost:5000/api/schoolPortalResults');
+  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
+  const [subjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
+  const [staffs] = useLocalStorage('schoolPortalStaff', [], 'http://localhost:5000/api/schoolPortalStaff');
 
-  // UI States
   const [message, setMessage] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -28,7 +27,6 @@ function AdminResultsApproval() {
     }
   }, [navigate]);
 
-  // Helper functions
   const getStudentName = (admissionNo) => {
     const student = students.find(s => s.admissionNo === admissionNo);
     return student ? `${student.firstName} ${student.lastName}` : 'Unknown Student';
@@ -44,18 +42,13 @@ function AdminResultsApproval() {
     return teacher ? `${teacher.firstname} ${teacher.surname}` : 'Unknown Teacher';
   };
 
-  // Approval logic
   const handleApprove = (resultId) => {
     if (window.confirm('Are you sure you want to approve this result?')) {
       const resultToApprove = pendingResults.find(r => r.id === resultId);
       if (resultToApprove) {
-        // Create the final result object with status as Approved
         const approvedResult = { ...resultToApprove, status: 'Approved' };
         
-        // Remove from pending list
         setPendingResults(prevPending => prevPending.filter(r => r.id !== resultId));
-        
-        // Add to the final approved results list, overwriting if an old one exists (important for re-submissions)
         setApprovedResults(prevApproved => {
           const existingIndex = prevApproved.findIndex(r => r.id === resultId);
           if (existingIndex > -1) {
@@ -73,14 +66,11 @@ function AdminResultsApproval() {
     }
   };
 
-  // Rejection logic
   const handleReject = (resultId) => {
     if (window.confirm('Are you sure you want to reject this result?')) {
       const resultToReject = pendingResults.find(r => r.id === resultId);
       if (resultToReject) {
-        // We could save rejected results to another list, but for now, we'll just remove it.
         setPendingResults(prevPending => prevPending.filter(r => r.id !== resultId));
-        // A rejected result is not added to the final approved list.
         setMessage({ type: 'error', text: 'Result rejected and removed from pending list.' });
       } else {
         setMessage({ type: 'error', text: 'Result not found in pending list.' });
@@ -96,6 +86,10 @@ function AdminResultsApproval() {
   
   if (!loggedInAdmin) {
     return <div className="content-section">Access Denied. Please log in as an Admin.</div>;
+  }
+
+  if (loadingPending || loadingApproved) {
+    return <div className="content-section">Loading pending results...</div>;
   }
 
   return (
@@ -138,7 +132,7 @@ function AdminResultsApproval() {
                     <td>{getStudentName(result.studentNameSelect)} ({result.studentNameSelect})</td>
                     <td>{result.classSelect}</td>
                     <td>{getSubjectName(result.subjectSelect)}</td>
-                    <td>{result.score}</td>
+                    <td>{result.totalScore}</td>
                     <td>{getTeacherName(result.submittedBy)}</td>
                     <td>
                       <button className="action-btn edit-btn" onClick={() => handleApprove(result.id)}>Approve</button>

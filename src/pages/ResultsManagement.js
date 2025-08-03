@@ -7,13 +7,13 @@ function ResultsManagement() {
   const navigate = useNavigate();
   const [loggedInUser, setLoggedInUser] = useState(null);
 
-  const [results, setResults] = useLocalStorage('schoolPortalResults', []);
-  const [pendingResults, setPendingResults] = useLocalStorage('schoolPortalPendingResults', []);
-  const [students] = useLocalStorage('schoolPortalStudents', []);
-  const [subjects] = useLocalStorage('schoolPortalSubjects', []);
-  const [staffs] = useLocalStorage('schoolPortalStaff', []);
+  // Update hooks to get data from the backend
+  const [results, setResults, loadingResults] = useLocalStorage('schoolPortalResults', [], 'http://localhost:5000/api/schoolPortalResults');
+  const [pendingResults, setPendingResults, loadingPending] = useLocalStorage('schoolPortalPendingResults', [], 'http://localhost:5000/api/schoolPortalPendingResults');
+  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
+  const [subjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
+  const [staffs] = useLocalStorage('schoolPortalStaff', [], 'http://localhost:5000/api/schoolPortalStaff');
 
-  // NEW STATE: Redefined to match the new table format
   const [newResult, setNewResult] = useState({
     classSelect: '',
     studentNameSelect: '',
@@ -36,8 +36,8 @@ function ResultsManagement() {
   
   const isTeacher = loggedInUser && loggedInUser.type === 'staff' && loggedInUser.role.includes('Teacher');
   const isAdmin = loggedInUser && loggedInUser.type === 'admin';
-  
-  // Effect to check login
+  const isResultsManager = loggedInUser && loggedInUser.type === 'staff' && loggedInUser.role.includes('Results Manager');
+
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('loggedInUser'));
     if (user && (user.type === 'admin' || (user.type === 'staff' && (user.role.includes('Teacher') || user.role.includes('Results Manager'))))) {
@@ -47,19 +47,16 @@ function ResultsManagement() {
     }
   }, [navigate]);
 
-  // Helper function to get student name from ID
   const getStudentName = (admissionNo) => {
     const student = students.find(s => s.admissionNo === admissionNo);
     return student ? `${student.firstName} ${student.lastName}` : 'Unknown Student';
   };
 
-  // Helper function to get subject name from code
   const getSubjectName = (subjectCode) => {
     const subject = subjects.find(s => s.subjectCode === subjectCode);
     return subject ? subject.subjectName : 'Unknown Subject';
   };
   
-  // NEW HELPER FUNCTION to calculate total score and grade
   const calculateTotalAndGrade = (firstCa, secondCa, assignment, exam) => {
     const total = parseFloat(firstCa) + parseFloat(secondCa) + parseFloat(assignment) + parseFloat(exam);
     let grade = '';
@@ -71,11 +68,6 @@ function ResultsManagement() {
     return { total, grade };
   };
 
-  // The rest of the component will be added in subsequent steps
-// src/pages/ResultsManagement.js (partial view)
-// ... code from Part 1 ...
-  
-  // Handle input changes for the form
   const handleChange = (e) => {
     const { id, value } = e.target;
     setNewResult(prevResult => ({
@@ -84,7 +76,6 @@ function ResultsManagement() {
     }));
   };
 
-  // Handle form submission (Add or Update for Admin, Submit for Teacher)
   const handleSubmit = (e) => {
     e.preventDefault();
     if (
@@ -100,8 +91,6 @@ function ResultsManagement() {
       alert('Please fill in all required fields.');
       return;
     }
-    
-    // Validate scores are numbers between 0 and 100
     const scores = [newResult.firstCaScore, newResult.secondCaScore, newResult.assignmentScore, newResult.examScore];
     for (const score of scores) {
       const numScore = parseInt(score);
@@ -110,9 +99,7 @@ function ResultsManagement() {
         return;
       }
     }
-
     const { total, grade } = calculateTotalAndGrade(newResult.firstCaScore, newResult.secondCaScore, newResult.assignmentScore, newResult.examScore);
-    
     const resultIdentifier = `${newResult.studentNameSelect}-${newResult.subjectSelect}-${newResult.termSelect}`;
     const resultToAddOrUpdate = { 
       ...newResult, 
@@ -121,7 +108,6 @@ function ResultsManagement() {
       id: resultIdentifier,
       submittedBy: loggedInUser?.staffId || 'Admin',
     };
-
     if (isTeacher) {
       resultToAddOrUpdate.status = 'Pending';
       setPendingResults(prevResults => {
@@ -152,8 +138,6 @@ function ResultsManagement() {
         alert('Result added successfully!');
       }
     }
-
-    // Reset form and state after submission
     setNewResult({
       classSelect: '',
       studentNameSelect: '',
@@ -212,56 +196,40 @@ function ResultsManagement() {
     setEditResultId(null);
   };
   
-// The rest of the component will be added in subsequent steps
-// src/pages/ResultsManagement.js (partial view)
-// ... code from Part 2 ...
-
-  const isResultsManager = loggedInUser && loggedInUser.type === 'staff' && loggedInUser.role.includes('Results Manager');
-
-  // Filter results based on logged-in user's role and search term
   const allResults = [...results, ...pendingResults];
   let resultsToDisplay = allResults;
-
   if (isTeacher) {
     const teacherAssignedClasses = loggedInUser.assignedClasses || [];
     const teacherAssignedSubjects = loggedInUser.assignedSubjects || [];
     const teacherId = loggedInUser.staffId;
-
     resultsToDisplay = allResults.filter(result =>
         (teacherAssignedClasses.includes(result.classSelect) && teacherAssignedSubjects.includes(result.subjectSelect)) ||
         (result.submittedBy === teacherId)
     );
   } else if (isResultsManager) {
-    // Results Manager sees all results for their assigned classes/subjects
     const managerAssignedClasses = loggedInUser.assignedClasses || [];
     const managerAssignedSubjects = loggedInUser.assignedSubjects || [];
-
     resultsToDisplay = allResults.filter(result =>
         managerAssignedClasses.includes(result.classSelect) && managerAssignedSubjects.includes(result.subjectSelect)
     );
   }
-
   const filteredResults = studentIdFilter
     ? resultsToDisplay.filter(result => result.studentNameSelect.toLowerCase().includes(studentIdFilter.toLowerCase()))
     : resultsToDisplay;
 
-  // Derived data for form dropdowns
   const uniqueClasses = [...new Set(students.map(s => s.studentClass))].sort();
-
   const availableClassesForInput = isTeacher || isResultsManager
     ? uniqueClasses.filter(cls => (loggedInUser.assignedClasses || []).includes(cls))
     : uniqueClasses;
-
   const availableStudentsForInput = isTeacher || isResultsManager
     ? students.filter(s => (loggedInUser.assignedClasses || []).includes(s.studentClass))
     : students;
-
   const availableSubjectsForInput = isTeacher || isResultsManager
     ? subjects.filter(sub => (loggedInUser.assignedSubjects || []).includes(sub.subjectCode))
     : subjects;
 
-  if (!loggedInUser) {
-    return <div className="content-section">Access Denied. Please log in as Admin or Staff.</div>;
+  if (!loggedInUser || loadingResults || loadingPending) {
+    return <div className="content-section">Loading results...</div>;
   }
 
   return (
@@ -363,7 +331,6 @@ function ResultsManagement() {
             value={newResult.examScore}
             onChange={handleChange}
           />
-
           {isAdmin ? (
             <button type="submit">{submitButtonText}</button>
           ) : (
@@ -404,7 +371,6 @@ function ResultsManagement() {
                     filteredResults.map(result => {
                       const isSubmittedByMe = isTeacher && result.submittedBy === loggedInUser.staffId;
                       const canEditOrDelete = isAdmin || (isSubmittedByMe && result.status === 'Pending');
-
                       return (
                       <tr key={result.id}>
                         <td>{getStudentName(result.studentNameSelect)} ({result.studentNameSelect})</td>

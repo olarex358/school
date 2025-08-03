@@ -7,27 +7,26 @@ function AdminFeesManagement() {
   const navigate = useNavigate();
   const [loggedInAdmin, setLoggedInAdmin] = useState(null);
 
-  const [feeRecords, setFeeRecords] = useLocalStorage('schoolPortalFeeRecords', []);
-  const [students] = useLocalStorage('schoolPortalStudents', []); // Load students for individual fees
+  // Update hooks to get data from the backend
+  const [feeRecords, setFeeRecords, loadingFees] = useLocalStorage('schoolPortalFeeRecords', [], 'http://localhost:5000/api/schoolPortalFeeRecords');
+  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/students');
 
   const [feeForm, setFeeForm] = useState({
-    feeType: '', // e.g., 'Tuition', 'Development Levy', 'Exam Fee'
+    feeType: '',
     amount: '',
     dueDate: '',
-    status: 'Unpaid', // 'Unpaid', 'Partially Paid', 'Paid'
-    paymentChannel: '', // 'Bank Transfer', 'Cash', 'Online'
+    status: 'Unpaid',
+    paymentChannel: '',
     notes: '',
-    isGeneralFee: true, // true for all students, false for individual
-    studentId: '' // Only if isGeneralFee is false (admissionNo)
+    isGeneralFee: true,
+    studentId: ''
   });
-
   const [formErrors, setFormErrors] = useState({});
   const [message, setMessage] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editFeeRecordId, setEditFeeRecordId] = useState(null);
-  const [searchTerm, setSearchTerm] = useState(''); // For filtering fee records by student ID or type
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // Derived data for dropdowns
   const uniqueFeeTypes = ['Tuition Fee', 'Development Levy', 'Sport & Extra-curricular', 'Exam Fee', 'Other'];
   const paymentChannels = ['Bank Transfer', 'Cash', 'Online Payment Gateway'];
 
@@ -48,7 +47,6 @@ function AdminFeesManagement() {
     if (!feeForm.status) errors.status = 'Status is required.';
     if (feeForm.status !== 'Unpaid' && !feeForm.paymentChannel) errors.paymentChannel = 'Payment channel is required if not unpaid.';
     if (!feeForm.isGeneralFee && !feeForm.studentId) errors.studentId = 'Please select a student for individual fees.';
-
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -59,31 +57,28 @@ function AdminFeesManagement() {
       setFeeForm(prev => ({
         ...prev,
         [id]: checked,
-        studentId: checked ? '' : prev.studentId // Clear studentId if it becomes general fee
+        studentId: checked ? '' : prev.studentId
       }));
     } else {
       setFeeForm(prev => ({ ...prev, [id]: value }));
     }
-    setFormErrors(prev => ({ ...prev, [id]: '' })); // Clear error on change
+    setFormErrors(prev => ({ ...prev, [id]: '' }));
     setMessage(null);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setMessage(null);
-
     if (!validateForm()) {
       setMessage({ type: 'error', text: 'Please correct the errors in the form.' });
       return;
     }
-
     const feeRecordToAddOrUpdate = {
       ...feeForm,
       amount: parseFloat(feeForm.amount),
-      id: isEditing ? editFeeRecordId : Date.now(), // Use existing ID or generate new
+      id: isEditing ? editFeeRecordId : Date.now(),
       timestamp: new Date().toISOString()
     };
-
     if (isEditing) {
       setFeeRecords(prevRecords =>
         prevRecords.map(rec =>
@@ -92,26 +87,21 @@ function AdminFeesManagement() {
       );
       setMessage({ type: 'success', text: 'Fee record updated successfully!' });
     } else {
-      // Check for duplicate general fees (same feeType, due date, amount, general)
       if (feeRecordToAddOrUpdate.isGeneralFee && feeRecords.some(r =>
         r.isGeneralFee && r.feeType === feeRecordToAddOrUpdate.feeType && r.dueDate === feeRecordToAddOrUpdate.dueDate
       )) {
         setMessage({ type: 'error', text: 'A general fee of this type and due date already exists.' });
         return;
       }
-      // Check for duplicate individual fees (same student, feeType, due date)
       if (!feeRecordToAddOrUpdate.isGeneralFee && feeRecords.some(r =>
         !r.isGeneralFee && r.studentId === feeRecordToAddOrUpdate.studentId && r.feeType === feeRecordToAddOrUpdate.feeType && r.dueDate === feeRecordToAddOrUpdate.dueDate
       )) {
         setMessage({ type: 'error', text: `This specific fee for ${getStudentName(feeRecordToAddOrUpdate.studentId)} on ${feeRecordToAddOrUpdate.dueDate} already exists.` });
         return;
       }
-
       setFeeRecords(prevRecords => [...prevRecords, feeRecordToAddOrUpdate]);
       setMessage({ type: 'success', text: 'Fee record added successfully!' });
     }
-
-    // Reset form
     setFeeForm({
       feeType: '',
       amount: '',
@@ -130,7 +120,7 @@ function AdminFeesManagement() {
   const editFeeRecord = (idToEdit) => {
     const record = feeRecords.find(rec => rec.id === idToEdit);
     if (record) {
-      setFeeForm(record); // Populate form
+      setFeeForm(record);
       setIsEditing(true);
       setEditFeeRecordId(idToEdit);
       setMessage(null);
@@ -163,28 +153,30 @@ function AdminFeesManagement() {
   };
 
   const getStudentName = (admissionNo) => {
-      const student = students.find(s => s.admissionNo === admissionNo);
-      return student ? `${student.firstName} ${student.lastName} (${student.admissionNo})` : 'Unknown Student';
+    const student = students.find(s => s.admissionNo === admissionNo);
+    return student ? `${student.firstName} ${student.lastName} (${student.admissionNo})` : 'Unknown Student';
   };
 
   const filteredFeeRecords = feeRecords.filter(record => {
     const matchesSearch = searchTerm ?
       (record.feeType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       record.notes.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       (record.studentId && getStudentName(record.studentId).toLowerCase().includes(searchTerm.toLowerCase())))
+        record.notes.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (record.studentId && getStudentName(record.studentId).toLowerCase().includes(searchTerm.toLowerCase())))
       : true;
     return matchesSearch;
   });
-
 
   if (!loggedInAdmin) {
     return <div className="content-section">Access Denied. Please log in as an Admin.</div>;
   }
 
+  if (loadingFees) {
+    return <div className="content-section">Loading fee data...</div>;
+  }
+
   return (
     <div className="content-section">
       <h1>Fee Management</h1>
-
       <div className="sub-section">
         <h2>{isEditing ? 'Edit Fee Record' : 'Add New Fee Record'}</h2>
         {message && (
@@ -204,7 +196,6 @@ function AdminFeesManagement() {
             />
             <label htmlFor="isGeneralFee" style={{ display: 'inline' }}>General Fee (for all students)</label>
           </div>
-
           {!feeForm.isGeneralFee && (
             <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
               <label htmlFor="studentId" style={{ display: 'block', marginBottom: '5px' }}>Select Student:</label>
@@ -223,7 +214,6 @@ function AdminFeesManagement() {
               {formErrors.studentId && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.studentId}</p>}
             </div>
           )}
-
           <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
             <label htmlFor="feeType" style={{ display: 'block', marginBottom: '5px' }}>Fee Type:</label>
             <select
@@ -240,7 +230,6 @@ function AdminFeesManagement() {
             </select>
             {formErrors.feeType && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.feeType}</p>}
           </div>
-
           <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
             <label htmlFor="amount" style={{ display: 'block', marginBottom: '5px' }}>Amount (₦):</label>
             <input
@@ -256,7 +245,6 @@ function AdminFeesManagement() {
             />
             {formErrors.amount && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.amount}</p>}
           </div>
-
           <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
             <label htmlFor="dueDate" style={{ display: 'block', marginBottom: '5px' }}>Due Date:</label>
             <input
@@ -269,7 +257,6 @@ function AdminFeesManagement() {
             />
             {formErrors.dueDate && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.dueDate}</p>}
           </div>
-
           <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
             <label htmlFor="status" style={{ display: 'block', marginBottom: '5px' }}>Status:</label>
             <select
@@ -285,7 +272,6 @@ function AdminFeesManagement() {
             </select>
             {formErrors.status && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.status}</p>}
           </div>
-
           <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
             <label htmlFor="paymentChannel" style={{ display: 'block', marginBottom: '5px' }}>Payment Channel (if paid/partially paid):</label>
             <select
@@ -302,7 +288,6 @@ function AdminFeesManagement() {
             </select>
             {formErrors.paymentChannel && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.paymentChannel}</p>}
           </div>
-
           <div style={{ marginBottom: '10px', flex: '1 1 100%' }}>
             <label htmlFor="notes" style={{ display: 'block', marginBottom: '5px' }}>Notes (Optional):</label>
             <textarea
@@ -313,12 +298,10 @@ function AdminFeesManagement() {
               rows="3"
             ></textarea>
           </div>
-
           <button type="submit" style={{ flex: '1 1 calc(50% - 7.5px)' }}>{isEditing ? 'Update Fee Record' : 'Add Fee Record'}</button>
           <button type="button" onClick={clearForm} style={{ flex: '1 1 calc(50% - 7.5px)', backgroundColor: '#6c757d', borderColor: '#6c757d' }}>Clear Form</button>
         </form>
       </div>
-
       <div className="sub-section">
         <h2>All Fee Records</h2>
         <input

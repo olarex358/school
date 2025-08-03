@@ -7,18 +7,16 @@ function ViewReports() {
   const [loggedInUser, setLoggedInUser] = useState(null);
   const navigate = useNavigate();
   
-  // States to hold loaded data from localStorage
-  const [students] = useLocalStorage('schoolPortalStudents', []);
-  const [results] = useLocalStorage('schoolPortalResults', []);
-  const [subjects] = useLocalStorage('schoolPortalSubjects', []);
+  // Update hooks to get data from the backend
+  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
+  const [results] = useLocalStorage('schoolPortalResults', [], 'http://localhost:5000/api/schoolPortalResults');
+  const [subjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
   
-  // States for report selection
   const [reportClassSelect, setReportClassSelect] = useState('');
   const [reportStudentSelect, setReportStudentSelect] = useState('');
   const [generatedReport, setGeneratedReport] = useState(null);
   const [reportMessage, setReportMessage] = useState(null);
   
-  // Ensure user is logged in as Admin or Staff to view reports
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('loggedInUser'));
     if (user && (user.type === 'admin' || user.type === 'staff')) {
@@ -28,7 +26,6 @@ function ViewReports() {
     }
   }, [navigate]);
   
-  // Helper function to get grade from a total score
   const getGrade = (totalScore) => {
     if (totalScore >= 70) return 'A';
     if (totalScore >= 60) return 'B';
@@ -37,13 +34,11 @@ function ViewReports() {
     return 'F';
   };
 
-  // Helper function to get student name from ID
   const getStudentName = (admissionNo) => {
     const student = students.find(s => s.admissionNo === admissionNo);
     return student ? `${student.firstName} ${student.lastName}` : 'Unknown Student';
   };
   
-  // Helper function to get student contact info (simulated/placeholder)
   const getStudentContact = (admissionNo) => {
     const student = students.find(s => s.admissionNo === admissionNo);
     return {
@@ -52,7 +47,6 @@ function ViewReports() {
     };
   };
   
-  // Helper function to get subject name from code
   const getSubjectName = (subjectCode) => {
     const subject = subjects.find(s => s.subjectCode === subjectCode);
     return subject ? subject.subjectName : 'Unknown Subject';
@@ -71,7 +65,6 @@ function ViewReports() {
       setGeneratedReport(null);
       return;
     }
-
     const studentResults = results.filter(r => r.studentNameSelect === reportStudentSelect);
     let reportHtml = `
       <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
@@ -79,7 +72,6 @@ function ViewReports() {
       <p><strong>Class:</strong> ${student.studentClass}</p>
       <h4 style="margin-top: 20px; color: #555;">Results:</h4>
     `;
-
     if (studentResults.length > 0) {
       reportHtml += `
         <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
@@ -189,7 +181,6 @@ function ViewReports() {
     setGeneratedReport(<div dangerouslySetInnerHTML={{ __html: reportHtml }} />);
   };
   
-  // NEW: Simulate sending report via Email
   const sendReportByEmail = () => {
     setReportMessage(null);
     if (!generatedReport || !reportStudentSelect) {
@@ -204,7 +195,6 @@ function ViewReports() {
     setReportMessage({type: 'success', text: `Report sent to ${studentName}'s email (${studentContact.email}) (simulated).`});
   };
   
-  // NEW: Simulate sending report via WhatsApp
   const sendReportByWhatsApp = () => {
     setReportMessage(null);
     if (!generatedReport || !reportStudentSelect) {
@@ -229,14 +219,16 @@ function ViewReports() {
   const studentsInSelectedClass = students.filter(
     s => reportClassSelect === '' || s.studentClass === reportClassSelect
   );
+  
+  const loading = students.length === 0 || subjects.length === 0 || results.length === 0;
 
   const handleLogout = () => {
     localStorage.removeItem('loggedInUser');
     navigate('/login');
   };
 
-  if (!loggedInUser) {
-    return <div className="content-section">Access Denied. Please log in as Admin or Staff.</div>;
+  if (!loggedInUser || loading) {
+    return <div className="content-section">Loading data...</div>;
   }
 
   return (

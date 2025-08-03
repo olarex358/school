@@ -8,19 +8,15 @@ function AdminMessaging() {
   const navigate = useNavigate();
   const [loggedInAdmin, setLoggedInAdmin] = useState(null);
 
-  // Load all students and staff to populate recipient dropdowns
-  const [students] = useLocalStorage('schoolPortalStudents', []);
-  const [staffs] = useLocalStorage('schoolPortalStaff', []);
-
-  // Store messages sent by admin
-  const [adminMessages, setAdminMessages] = useLocalStorage('schoolPortalAdminMessages', []);
-
-  // NEW LINE: Use the new hook
+  // Update hooks to get data from the backend
+  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/students');
+  const [staffs] = useLocalStorage('schoolPortalStaff', [], 'http://localhost:5000/api/staffs');
+  const [adminMessages, setAdminMessages, loadingMessages] = useLocalStorage('schoolPortalAdminMessages', [], 'http://localhost:5000/api/adminMessages');
   const { addNotification } = useNotifications();
 
   // Form states
-  const [recipientType, setRecipientType] = useState('allStudents'); // 'allStudents', 'individualStudent', 'allStaff', 'individualStaff'
-  const [selectedRecipientId, setSelectedRecipientId] = useState(''); // Stores admissionNo or staffId
+  const [recipientType, setRecipientType] = useState('allStudents');
+  const [selectedRecipientId, setSelectedRecipientId] = useState('');
   const [messageSubject, setMessageSubject] = useState('');
   const [messageBody, setMessageBody] = useState('');
 
@@ -62,7 +58,6 @@ function AdminMessaging() {
       setMessage({ type: 'error', text: 'Please correct the errors in the form.' });
       return;
     }
-
     const newMessage = {
       id: Date.now(),
       sender: loggedInAdmin ? loggedInAdmin.username : 'Admin',
@@ -73,41 +68,33 @@ function AdminMessaging() {
       recipientId: selectedRecipientId || null,
       isRead: false,
     };
-    // Simulate sending: Add message to localStorage
     setAdminMessages(prevMessages => [...prevMessages, newMessage]);
-    
-    // NEW NOTIFICATION LOGIC:
     let notificationTitle = `New Admin Message: ${messageSubject}`;
     let notificationBody = messageBody;
-
     if (recipientType.includes('individual')) {
-        const recipientName = recipientType === 'individualStudent'
-            ? (students.find(s => s.admissionNo === selectedRecipientId)?.firstName + ' ' + students.find(s => s.admissionNo === selectedRecipientId)?.lastName || selectedRecipientId)
-            : (staffs.find(s => s.staffId === selectedRecipientId)?.firstname + ' ' + staffs.find(s => s.staffId === selectedRecipientId)?.surname || selectedRecipientId);
-        
-        // Add a notification for the recipient
-        addNotification({
-            title: notificationTitle,
-            body: notificationBody,
-            recipientType: recipientType,
-            recipientId: selectedRecipientId
-        });
-        setMessage({ type: 'success', text: `Message and notification sent to ${recipientName} (simulated email/WhatsApp).` });
-        console.log(`Simulating email/WhatsApp to ${recipientName}: Subject: "${messageSubject}", Body: "${messageBody}"`);
+      const recipientName = recipientType === 'individualStudent'
+        ? (students.find(s => s.admissionNo === selectedRecipientId)?.firstName + ' ' + students.find(s => s.admissionNo === selectedRecipientId)?.lastName || selectedRecipientId)
+        : (staffs.find(s => s.staffId === selectedRecipientId)?.firstname + ' ' + staffs.find(s => s.staffId === selectedRecipientId)?.surname || selectedRecipientId);
+      addNotification({
+        title: notificationTitle,
+        body: notificationBody,
+        recipientType: recipientType,
+        recipientId: selectedRecipientId
+      });
+      setMessage({ type: 'success', text: `Message and notification sent to ${recipientName} (simulated email/WhatsApp).` });
+      console.log(`Simulating email/WhatsApp to ${recipientName}: Subject: "${messageSubject}", Body: "${messageBody}"`);
     } else if (recipientType.includes('all')) {
-        addNotification({
-            title: notificationTitle,
-            body: notificationBody,
-            recipientType: recipientType,
-            recipientId: null
-        });
-        setMessage({ type: 'success', text: `Message and notification sent to all ${recipientType.replace('all', '')} (simulated).` });
-        console.log(`Simulating message to all ${recipientType.replace('all', '')}: Subject: "${messageSubject}", Body: "${messageBody}"`);
+      addNotification({
+        title: notificationTitle,
+        body: notificationBody,
+        recipientType: recipientType,
+        recipientId: null
+      });
+      setMessage({ type: 'success', text: `Message and notification sent to all ${recipientType.replace('all', '')} (simulated).` });
+      console.log(`Simulating message to all ${recipientType.replace('all', '')}: Subject: "${messageSubject}", Body: "${messageBody}"`);
     } else {
-        setMessage({ type: 'success', text: 'Message sent successfully (simulated).' });
+      setMessage({ type: 'success', text: 'Message sent successfully (simulated).' });
     }
-
-    // Reset form
     setSelectedRecipientId('');
     setMessageSubject('');
     setMessageBody('');
@@ -125,6 +112,10 @@ function AdminMessaging() {
 
   if (!loggedInAdmin) {
     return <div className="content-section">Access Denied. Please log in as an Admin.</div>;
+  }
+
+  if (loadingMessages) {
+    return <div className="content-section">Loading messages...</div>;
   }
 
   return (

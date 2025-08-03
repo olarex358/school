@@ -119,8 +119,7 @@ function StaffTimetable() {
                 ))}
               </tr>
             </thead>
-            <tbody>// src/pages/StaffTimetable.js (partial view)
-// ...
+            <tbody>
               {uniqueTimeSlots.map(slot => (
                 <tr key={slot}>
                   <td><strong>{slot}</strong></td>
