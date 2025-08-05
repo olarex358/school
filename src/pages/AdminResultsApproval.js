@@ -42,38 +42,62 @@ function AdminResultsApproval() {
     return teacher ? `${teacher.firstname} ${teacher.surname}` : 'Unknown Teacher';
   };
 
-  const handleApprove = (resultId) => {
+  const handleApprove = async (resultId) => {
     if (window.confirm('Are you sure you want to approve this result?')) {
       const resultToApprove = pendingResults.find(r => r.id === resultId);
-      if (resultToApprove) {
-        const approvedResult = { ...resultToApprove, status: 'Approved' };
-        
-        setPendingResults(prevPending => prevPending.filter(r => r.id !== resultId));
-        setApprovedResults(prevApproved => {
-          const existingIndex = prevApproved.findIndex(r => r.id === resultId);
-          if (existingIndex > -1) {
-              const updated = [...prevApproved];
-              updated[existingIndex] = approvedResult;
-              return updated;
-          }
-          return [...prevApproved, approvedResult];
+      if (!resultToApprove) {
+        setMessage({ type: 'error', text: 'Result not found in pending list.' });
+        return;
+      }
+      const approvedResult = { ...resultToApprove, status: 'Approved' };
+
+      try {
+        // 1. Send a POST request to add the approved result to the 'results' collection
+        const addResponse = await fetch('http://localhost:5000/api/schoolPortalResults', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(approvedResult),
         });
 
-        setMessage({ type: 'success', text: 'Result approved and moved to final records.' });
-      } else {
-        setMessage({ type: 'error', text: 'Result not found in pending list.' });
+        // 2. Send a DELETE request to remove the result from the 'pendingResults' collection
+        const deleteResponse = await fetch(`http://localhost:5000/api/schoolPortalPendingResults/${resultToApprove._id}`, {
+          method: 'DELETE',
+        });
+
+        if (addResponse.ok && deleteResponse.ok) {
+          // Update local state after successful backend operations
+          setPendingResults(prevPending => prevPending.filter(r => r.id !== resultId));
+          setApprovedResults(prevApproved => [...prevApproved, approvedResult]);
+          setMessage({ type: 'success', text: 'Result approved and moved to final records.' });
+        } else {
+          setMessage({ type: 'error', text: 'Failed to approve result. Please try again.' });
+        }
+      } catch (err) {
+        setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
       }
     }
   };
 
-  const handleReject = (resultId) => {
+  const handleReject = async (resultId) => {
     if (window.confirm('Are you sure you want to reject this result?')) {
       const resultToReject = pendingResults.find(r => r.id === resultId);
-      if (resultToReject) {
-        setPendingResults(prevPending => prevPending.filter(r => r.id !== resultId));
-        setMessage({ type: 'error', text: 'Result rejected and removed from pending list.' });
-      } else {
+      if (!resultToReject) {
         setMessage({ type: 'error', text: 'Result not found in pending list.' });
+        return;
+      }
+      try {
+        const response = await fetch(`http://localhost:5000/api/schoolPortalPendingResults/${resultToReject._id}`, {
+          method: 'DELETE',
+        });
+        if (response.ok) {
+          setPendingResults(prevPending => prevPending.filter(r => r.id !== resultId));
+          setMessage({ type: 'success', text: 'Result rejected and removed from pending list.' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to reject result.' });
+        }
+      } catch (err) {
+        setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
       }
     }
   };

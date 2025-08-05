@@ -25,6 +25,7 @@ function StaffManagement() {
   });
   const [submitButtonText, setSubmitButtonText] = useState('Add Staff');
   const [isEditing, setIsEditing] = useState(false);
+  const [editStaffId, setEditStaffId] = useState(null); // Keep track of the database ID for editing
   const [searchTerm, setSearchTerm] = useState('');
   const [formErrors, setFormErrors] = useState({});
   const [message, setMessage] = useState(null);
@@ -116,7 +117,7 @@ function StaffManagement() {
     return `STAFF/${currentYear}/${String(nextCounter).padStart(4, '0')}`;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage(null);
     let errors = {};
@@ -143,23 +144,46 @@ function StaffManagement() {
     if (!isEditing) {
       finalStaffId = generateStaffId();
     }
-    const isDuplicate = staffs.some(s => s.staffId === finalStaffId && s.staffId !== newStaff.staffId);
-    if (isDuplicate) {
-        setMessage({ type: 'error', text: 'Staff ID already exists. Please use a unique one or edit the existing staff.' });
-        return;
+    const staffToSave = { ...newStaff, staffId: finalStaffId, username: finalStaffId }; // Set username for backend
+    
+    try {
+      if (isEditing) {
+        const response = await fetch(`http://localhost:5000/api/schoolPortalStaff/${editStaffId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(staffToSave),
+        });
+        if (response.ok) {
+          const updatedStaff = await response.json();
+          setStaffs(prevStaffs =>
+            prevStaffs.map(staff =>
+              staff._id === updatedStaff._id ? updatedStaff : staff
+            )
+          );
+          setMessage({ type: 'success', text: 'Staff data updated successfully!' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to update staff.' });
+        }
+      } else {
+        const response = await fetch('http://localhost:5000/api/schoolPortalStaff', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(staffToSave),
+        });
+        if (response.ok) {
+          const newStaffMember = await response.json();
+          setStaffs(prevStaffs => [...prevStaffs, newStaffMember]);
+          setMessage({ type: 'success', text: 'New staff registered successfully!' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to add new staff.' });
+        }
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
     }
-    if (isEditing) {
-      setStaffs(prevStaffs =>
-        prevStaffs.map(staff =>
-          staff.staffId === newStaff.staffId ? { ...newStaff, staffId: finalStaffId } : staff
-        )
-      );
-      setMessage({ type: 'success', text: 'Staff data updated successfully!' });
-    } else {
-      const staffToAdd = { ...newStaff, staffId: finalStaffId };
-      setStaffs(prevStaffs => [...prevStaffs, staffToAdd]);
-      setMessage({ type: 'success', text: 'New staff registered successfully!' });
-    }
+    
     setNewStaff({
       surname: '',
       firstname: '',
@@ -186,15 +210,33 @@ function StaffManagement() {
       setNewStaff(staffToEdit);
       setSubmitButtonText('Update Staff');
       setIsEditing(true);
+      setEditStaffId(staffToEdit._id); // Store the database ID
       setFormErrors({});
       setMessage(null);
     }
   };
   
-  const deleteStaff = (staffIdToDelete) => {
+  const deleteStaff = async (staffIdToDelete) => {
     if (window.confirm(`Are you sure you want to delete staff with ID: ${staffIdToDelete}?`)) {
-      setStaffs(prevStaffs => prevStaffs.filter(staff => staff.staffId !== staffIdToDelete));
-      setMessage({ type: 'success', text: 'Staff deleted successfully!' });
+      const staffToDelete = staffs.find(s => s.staffId === staffIdToDelete);
+      if (!staffToDelete) {
+        setMessage({ type: 'error', text: 'Staff not found.' });
+        return;
+      }
+      try {
+        const response = await fetch(`http://localhost:5000/api/schoolPortalStaff/${staffToDelete._id}`, {
+          method: 'DELETE',
+        });
+        if (response.ok) {
+          setStaffs(prevStaffs => prevStaffs.filter(staff => staff.staffId !== staffIdToDelete));
+          setMessage({ type: 'success', text: 'Staff deleted successfully!' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to delete staff.' });
+        }
+      } catch (err) {
+        setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
+      }
     }
   };
   
@@ -461,7 +503,7 @@ function StaffManagement() {
                 <tbody>
                 {filteredStaffs.length > 0 ? (
                     filteredStaffs.map(staff => (
-                    <tr key={staff.staffId}>
+                    <tr key={staff._id}>
                         <td>{staff.staffId}</td>
                         <td>{staff.firstname} {staff.surname}</td>
                         <td>{staff.role}</td>

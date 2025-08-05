@@ -9,7 +9,7 @@ function AdminFeesManagement() {
 
   // Update hooks to get data from the backend
   const [feeRecords, setFeeRecords, loadingFees] = useLocalStorage('schoolPortalFeeRecords', [], 'http://localhost:5000/api/schoolPortalFeeRecords');
-  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/students');
+  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
 
   const [feeForm, setFeeForm] = useState({
     feeType: '',
@@ -66,7 +66,7 @@ function AdminFeesManagement() {
     setMessage(null);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage(null);
     if (!validateForm()) {
@@ -76,32 +76,46 @@ function AdminFeesManagement() {
     const feeRecordToAddOrUpdate = {
       ...feeForm,
       amount: parseFloat(feeForm.amount),
-      id: isEditing ? editFeeRecordId : Date.now(),
       timestamp: new Date().toISOString()
     };
-    if (isEditing) {
-      setFeeRecords(prevRecords =>
-        prevRecords.map(rec =>
-          rec.id === editFeeRecordId ? feeRecordToAddOrUpdate : rec
-        )
-      );
-      setMessage({ type: 'success', text: 'Fee record updated successfully!' });
-    } else {
-      if (feeRecordToAddOrUpdate.isGeneralFee && feeRecords.some(r =>
-        r.isGeneralFee && r.feeType === feeRecordToAddOrUpdate.feeType && r.dueDate === feeRecordToAddOrUpdate.dueDate
-      )) {
-        setMessage({ type: 'error', text: 'A general fee of this type and due date already exists.' });
-        return;
+    try {
+      if (isEditing) {
+        const response = await fetch(`http://localhost:5000/api/schoolPortalFeeRecords/${editFeeRecordId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(feeRecordToAddOrUpdate),
+        });
+        if (response.ok) {
+          const updatedRecord = await response.json();
+          setFeeRecords(prevRecords =>
+            prevRecords.map(rec =>
+              rec._id === updatedRecord._id ? updatedRecord : rec
+            )
+          );
+          setMessage({ type: 'success', text: 'Fee record updated successfully!' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to update fee record.' });
+        }
+      } else {
+        const response = await fetch('http://localhost:5000/api/schoolPortalFeeRecords', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(feeRecordToAddOrUpdate),
+        });
+        if (response.ok) {
+          const newRecord = await response.json();
+          setFeeRecords(prevRecords => [...prevRecords, newRecord]);
+          setMessage({ type: 'success', text: 'Fee record added successfully!' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to add new fee record.' });
+        }
       }
-      if (!feeRecordToAddOrUpdate.isGeneralFee && feeRecords.some(r =>
-        !r.isGeneralFee && r.studentId === feeRecordToAddOrUpdate.studentId && r.feeType === feeRecordToAddOrUpdate.feeType && r.dueDate === feeRecordToAddOrUpdate.dueDate
-      )) {
-        setMessage({ type: 'error', text: `This specific fee for ${getStudentName(feeRecordToAddOrUpdate.studentId)} on ${feeRecordToAddOrUpdate.dueDate} already exists.` });
-        return;
-      }
-      setFeeRecords(prevRecords => [...prevRecords, feeRecordToAddOrUpdate]);
-      setMessage({ type: 'success', text: 'Fee record added successfully!' });
+    } catch (err) {
+      setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
     }
+    
     setFeeForm({
       feeType: '',
       amount: '',
@@ -122,16 +136,33 @@ function AdminFeesManagement() {
     if (record) {
       setFeeForm(record);
       setIsEditing(true);
-      setEditFeeRecordId(idToEdit);
+      setEditFeeRecordId(record._id);
       setMessage(null);
       setFormErrors({});
     }
   };
 
-  const deleteFeeRecord = (idToDelete) => {
+  const deleteFeeRecord = async (idToDelete) => {
     if (window.confirm('Are you sure you want to delete this fee record?')) {
-      setFeeRecords(prevRecords => prevRecords.filter(rec => rec.id !== idToDelete));
-      setMessage({ type: 'success', text: 'Fee record deleted successfully!' });
+      const recordToDelete = feeRecords.find(rec => rec.id === idToDelete);
+      if (!recordToDelete) {
+        setMessage({ type: 'error', text: 'Record not found.' });
+        return;
+      }
+      try {
+        const response = await fetch(`http://localhost:5000/api/schoolPortalFeeRecords/${recordToDelete._id}`, {
+          method: 'DELETE',
+        });
+        if (response.ok) {
+          setFeeRecords(prevRecords => prevRecords.filter(rec => rec.id !== idToDelete));
+          setMessage({ type: 'success', text: 'Fee record deleted successfully!' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to delete fee record.' });
+        }
+      } catch (err) {
+        setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
+      }
     }
   };
 
@@ -329,7 +360,7 @@ function AdminFeesManagement() {
             <tbody>
               {filteredFeeRecords.length > 0 ? (
                 filteredFeeRecords.map(record => (
-                  <tr key={record.id}>
+                  <tr key={record._id}>
                     <td>{record.isGeneralFee ? 'General' : 'Individual'}</td>
                     <td>{record.isGeneralFee ? 'All Students' : getStudentName(record.studentId)}</td>
                     <td>{record.feeType}</td>

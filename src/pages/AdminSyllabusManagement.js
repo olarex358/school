@@ -9,8 +9,8 @@ function AdminSyllabusManagement() {
 
   // Update hooks to get data from the backend
   const [syllabusEntries, setSyllabusEntries, loadingSyllabus] = useLocalStorage('schoolPortalSyllabusEntries', [], 'http://localhost:5000/api/schoolPortalSyllabusEntries');
-  const [subjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/subjects');
-  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/students');
+  const [subjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
+  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
 
   const [syllabusForm, setSyllabusForm] = useState({
     title: '',
@@ -55,7 +55,7 @@ function AdminSyllabusManagement() {
     setMessage(null);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage(null);
     if (!validateForm()) {
@@ -64,20 +64,47 @@ function AdminSyllabusManagement() {
     }
     const syllabusToAddOrUpdate = {
       ...syllabusForm,
-      id: isEditing ? editSyllabusId : Date.now(),
       timestamp: new Date().toISOString()
     };
-    if (isEditing) {
-      setSyllabusEntries(prevEntries =>
-        prevEntries.map(entry =>
-          entry.id === editSyllabusId ? syllabusToAddOrUpdate : entry
-        )
-      );
-      setMessage({ type: 'success', text: 'Syllabus entry updated successfully!' });
-    } else {
-      setSyllabusEntries(prevEntries => [...prevEntries, syllabusToAddOrUpdate]);
-      setMessage({ type: 'success', text: 'Syllabus entry added successfully!' });
+    
+    try {
+      if (isEditing) {
+        const response = await fetch(`http://localhost:5000/api/schoolPortalSyllabusEntries/${editSyllabusId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(syllabusToAddOrUpdate),
+        });
+        if (response.ok) {
+          const updatedEntry = await response.json();
+          setSyllabusEntries(prevEntries =>
+            prevEntries.map(entry =>
+              entry._id === updatedEntry._id ? updatedEntry : entry
+            )
+          );
+          setMessage({ type: 'success', text: 'Syllabus entry updated successfully!' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to update syllabus entry.' });
+        }
+      } else {
+        const response = await fetch('http://localhost:5000/api/schoolPortalSyllabusEntries', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(syllabusToAddOrUpdate),
+        });
+        if (response.ok) {
+          const newEntry = await response.json();
+          setSyllabusEntries(prevEntries => [...prevEntries, newEntry]);
+          setMessage({ type: 'success', text: 'Syllabus entry added successfully!' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to add new syllabus entry.' });
+        }
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
     }
+    
     setSyllabusForm({ title: '', description: '', applicableClass: '', applicableSubject: '', audience: 'all' });
     setIsEditing(false);
     setEditSyllabusId(null);
@@ -85,7 +112,7 @@ function AdminSyllabusManagement() {
   };
 
   const editSyllabus = (idToEdit) => {
-    const entry = syllabusEntries.find(e => e.id === idToEdit);
+    const entry = syllabusEntries.find(e => e._id === idToEdit);
     if (entry) {
       setSyllabusForm(entry);
       setIsEditing(true);
@@ -95,10 +122,22 @@ function AdminSyllabusManagement() {
     }
   };
 
-  const deleteSyllabus = (idToDelete) => {
+  const deleteSyllabus = async (idToDelete) => {
     if (window.confirm('Are you sure you want to delete this syllabus entry?')) {
-      setSyllabusEntries(prevEntries => prevEntries.filter(entry => entry.id !== idToDelete));
-      setMessage({ type: 'success', text: 'Syllabus entry deleted successfully!' });
+      try {
+        const response = await fetch(`http://localhost:5000/api/schoolPortalSyllabusEntries/${idToDelete}`, {
+          method: 'DELETE',
+        });
+        if (response.ok) {
+          setSyllabusEntries(prevEntries => prevEntries.filter(entry => entry._id !== idToDelete));
+          setMessage({ type: 'success', text: 'Syllabus entry deleted successfully!' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to delete syllabus entry.' });
+        }
+      } catch (err) {
+        setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
+      }
     }
   };
 
@@ -242,15 +281,15 @@ function AdminSyllabusManagement() {
             <tbody>
               {filteredSyllabus.length > 0 ? (
                 filteredSyllabus.map(entry => (
-                  <tr key={entry.id}>
+                  <tr key={entry._id}>
                     <td>{entry.title}</td>
                     <td>{entry.applicableClass.charAt(0).toUpperCase() + entry.applicableClass.slice(1)}</td>
                     <td>{getSubjectName(entry.applicableSubject)}</td>
                     <td>{entry.audience.charAt(0).toUpperCase() + entry.audience.slice(1)}</td>
                     <td>{entry.description.substring(0, 100)}...</td>
                     <td>
-                      <button className="action-btn edit-btn" onClick={() => editSyllabus(entry.id)}>Edit</button>
-                      <button className="action-btn delete-btn" onClick={() => deleteSyllabus(entry.id)}>Delete</button>
+                      <button className="action-btn edit-btn" onClick={() => editSyllabus(entry._id)}>Edit</button>
+                      <button className="action-btn delete-btn" onClick={() => deleteSyllabus(entry._id)}>Delete</button>
                     </td>
                   </tr>
                 ))

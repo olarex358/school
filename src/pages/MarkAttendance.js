@@ -8,9 +8,9 @@ function MarkAttendance() {
   const [loggedInStaff, setLoggedInStaff] = useState(null);
 
   // Data from localStorage
-  const [students] = useLocalStorage('schoolPortalStudents', []);
-  const [attendanceRecords, setAttendanceRecords] = useLocalStorage('schoolPortalAttendance', []); // New localStorage key
-  const [staffs] = useLocalStorage('schoolPortalStaff', []); // To get teacher's assigned classes
+  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
+  const [attendanceRecords, setAttendanceRecords] = useLocalStorage('schoolPortalAttendance', [], 'http://localhost:5000/api/schoolPortalAttendance');
+  const [staffs] = useLocalStorage('schoolPortalStaff', [], 'http://localhost:5000/api/schoolPortalStaff');
 
   // Form states
   const [selectedClass, setSelectedClass] = useState('');
@@ -67,7 +67,7 @@ function MarkAttendance() {
     }));
   };
 
-  const handleSubmitAttendance = (e) => {
+  const handleSubmitAttendance = async (e) => {
     e.preventDefault();
     setMessage(null);
 
@@ -94,13 +94,40 @@ function MarkAttendance() {
       });
     });
 
-    // Filter out old records for the selected class and date, then add new ones
-    const updatedAttendanceRecords = attendanceRecords.filter(
-      rec => !(rec.date === selectedDate && rec.class === selectedClass)
-    ).concat(newRecords);
+    try {
+        // Clear existing records for the day/class combination
+        const recordsToDelete = attendanceRecords.filter(
+            rec => rec.date === selectedDate && rec.class === selectedClass
+        );
+        const deletePromises = recordsToDelete.map(rec =>
+            fetch(`http://localhost:5000/api/schoolPortalAttendance/${rec._id}`, {
+                method: 'DELETE',
+            })
+        );
+        await Promise.all(deletePromises);
 
-    setAttendanceRecords(updatedAttendanceRecords);
-    setMessage({ type: 'success', text: `Attendance for ${selectedClass} on ${selectedDate} saved successfully!` });
+        // Add the new records
+        const createPromises = newRecords.map(rec =>
+            fetch('http://localhost:5000/api/schoolPortalAttendance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(rec),
+            })
+        );
+        await Promise.all(createPromises);
+
+        // Fetch the updated list from the backend to refresh state
+        const updatedResponse = await fetch('http://localhost:5000/api/schoolPortalAttendance');
+        if (updatedResponse.ok) {
+            const updatedRecords = await updatedResponse.json();
+            setAttendanceRecords(updatedRecords);
+            setMessage({ type: 'success', text: `Attendance for ${selectedClass} on ${selectedDate} saved successfully!` });
+        } else {
+            setMessage({ type: 'error', text: 'Failed to save attendance. Please try again.' });
+        }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
+    }
   };
 
   const getStudentName = (admissionNo) => {
@@ -171,7 +198,7 @@ function MarkAttendance() {
                 </thead>
                 <tbody>
                   {studentsInClass.map((student, index) => (
-                    <tr key={student.admissionNo}>
+                    <tr key={student._id}>
                       <td>{index + 1}</td>
                       <td>{getStudentName(student.admissionNo)}</td>
                       <td>{student.admissionNo}</td>

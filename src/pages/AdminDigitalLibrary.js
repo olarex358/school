@@ -64,27 +64,55 @@ function AdminDigitalLibrary() {
     setMessage(null);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage(null);
     if (!validateForm()) {
       setMessage({ type: 'error', text: 'Please correct the errors in the form.' });
       return;
     }
-    const resourceToAddOrUpdate = {
+    
+    const resourceToSave = {
       ...resourceForm,
-      id: isEditing ? editResourceId : Date.now(),
       timestamp: new Date().toISOString(),
     };
-    if (isEditing) {
-      setDigitalResources(prev =>
-        prev.map(res => (res.id === editResourceId ? resourceToAddOrUpdate : res))
-      );
-      setMessage({ type: 'success', text: 'Resource updated successfully!' });
-    } else {
-      setDigitalResources(prev => [...prev, resourceToAddOrUpdate]);
-      setMessage({ type: 'success', text: 'New resource added successfully!' });
+
+    try {
+      if (isEditing) {
+        const response = await fetch(`http://localhost:5000/api/schoolPortalDigitalLibrary/${editResourceId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(resourceToSave),
+        });
+        if (response.ok) {
+          const updatedResource = await response.json();
+          setDigitalResources(prev =>
+            prev.map(res => (res._id === updatedResource._id ? updatedResource : res))
+          );
+          setMessage({ type: 'success', text: 'Resource updated successfully!' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to update resource.' });
+        }
+      } else {
+        const response = await fetch('http://localhost:5000/api/schoolPortalDigitalLibrary', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(resourceToSave),
+        });
+        if (response.ok) {
+          const newResource = await response.json();
+          setDigitalResources(prev => [...prev, newResource]);
+          setMessage({ type: 'success', text: 'New resource added successfully!' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to add new resource.' });
+        }
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
     }
+    
     setResourceForm({
       title: '',
       description: '',
@@ -98,7 +126,7 @@ function AdminDigitalLibrary() {
   };
 
   const editResource = (idToEdit) => {
-    const resource = digitalResources.find(res => res.id === idToEdit);
+    const resource = digitalResources.find(res => res._id === idToEdit);
     if (resource) {
       setResourceForm(resource);
       setIsEditing(true);
@@ -108,10 +136,22 @@ function AdminDigitalLibrary() {
     }
   };
 
-  const deleteResource = (idToDelete) => {
+  const deleteResource = async (idToDelete) => {
     if (window.confirm('Are you sure you want to delete this resource?')) {
-      setDigitalResources(prev => prev.filter(res => res.id !== idToDelete));
-      setMessage({ type: 'success', text: 'Resource deleted successfully!' });
+      try {
+        const response = await fetch(`http://localhost:5000/api/schoolPortalDigitalLibrary/${idToDelete}`, {
+          method: 'DELETE',
+        });
+        if (response.ok) {
+          setDigitalResources(prev => prev.filter(res => res._id !== idToDelete));
+          setMessage({ type: 'success', text: 'Resource deleted successfully!' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to delete resource.' });
+        }
+      } catch (err) {
+        setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
+      }
     }
   };
 
@@ -251,7 +291,7 @@ function AdminDigitalLibrary() {
             <tbody>
               {filteredResources.length > 0 ? (
                 filteredResources.map(res => (
-                  <tr key={res.id}>
+                  <tr key={res._id}>
                     <td>{res.title}</td>
                     <td>{res.description.substring(0, 50)}...</td>
                     <td>
@@ -262,8 +302,8 @@ function AdminDigitalLibrary() {
                     <td>{res.audience}</td>
                     <td>{res.applicableClass}</td>
                     <td>
-                      <button className="action-btn edit-btn" onClick={() => editResource(res.id)}>Edit</button>
-                      <button className="action-btn delete-btn" onClick={() => deleteResource(res.id)}>Delete</button>
+                      <button className="action-btn edit-btn" onClick={() => editResource(res._id)}>Edit</button>
+                      <button className="action-btn delete-btn" onClick={() => deleteResource(res._id)}>Delete</button>
                     </td>
                   </tr>
                 ))

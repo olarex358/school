@@ -22,6 +22,7 @@ function StudentManagement() {
   });
   const [submitButtonText, setSubmitButtonText] = useState('Register Student');
   const [isEditing, setIsEditing] = useState(false);
+  const [editStudentId, setEditStudentId] = useState(null); // Keep track of the database ID for editing
   const [searchTerm, setSearchTerm] = useState('');
   const [formErrors, setFormErrors] = useState({});
   const [message, setMessage] = useState(null);
@@ -103,7 +104,7 @@ function StudentManagement() {
     return `BAC/STD/${currentYear}/${String(nextCounter).padStart(4, '0')}`;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage(null);
     let errors = {};
@@ -118,26 +119,49 @@ function StudentManagement() {
       return;
     }
     let finalAdmissionNo = newStudent.admissionNo;
-    if (isNewStudentMode) {
+    if (!isEditing) {
       finalAdmissionNo = generateAdmissionNumber();
     }
-    const isDuplicate = students.some(s => s.admissionNo === finalAdmissionNo && s.id !== newStudent.id);
-    if (isDuplicate) {
-      setMessage({ type: 'error', text: 'Admission Number already exists. Please use a unique one.' });
-      return;
+    const studentToSave = { ...newStudent, admissionNo: finalAdmissionNo, username: finalAdmissionNo };
+    
+    try {
+      if (isEditing) {
+        const response = await fetch(`http://localhost:5000/api/schoolPortalStudents/${editStudentId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(studentToSave),
+        });
+        if (response.ok) {
+          const updatedStudent = await response.json();
+          setStudents(prevStudents =>
+            prevStudents.map(student =>
+              student._id === updatedStudent._id ? updatedStudent : student
+            )
+          );
+          setMessage({ type: 'success', text: 'Student data updated successfully!' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to update student.' });
+        }
+      } else {
+        const response = await fetch('http://localhost:5000/api/schoolPortalStudents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(studentToSave),
+        });
+        if (response.ok) {
+          const newStudentEntry = await response.json();
+          setStudents(prevStudents => [...prevStudents, newStudentEntry]);
+          setMessage({ type: 'success', text: 'New student registered successfully!' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to add new student.' });
+        }
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
     }
-    if (isEditing) {
-      setStudents(prevStudents =>
-        prevStudents.map(student =>
-          student.id === newStudent.id ? { ...newStudent, admissionNo: finalAdmissionNo, id: finalAdmissionNo } : student
-        )
-      );
-      setMessage({ type: 'success', text: 'Student data updated successfully!' });
-    } else {
-      const studentToAdd = { ...newStudent, id: finalAdmissionNo, admissionNo: finalAdmissionNo };
-      setStudents(prevStudents => [...prevStudents, studentToAdd]);
-      setMessage({ type: 'success', text: 'New student registered successfully!' });
-    }
+    
     setNewStudent({
       firstName: '',
       lastName: '',
@@ -158,22 +182,40 @@ function StudentManagement() {
     setFormErrors({});
   };
   
-  const editStudent = (admissionNoToEdit) => {
-    const studentToEdit = students.find(s => s.admissionNo === admissionNoToEdit);
+  const editStudent = (studentIdToEdit) => {
+    const studentToEdit = students.find(s => s.admissionNo === studentIdToEdit);
     if (studentToEdit) {
       setNewStudent(studentToEdit);
       setSubmitButtonText('Update Student');
       setIsEditing(true);
       setIsNewStudentMode(false);
+      setEditStudentId(studentToEdit._id); // Store the database ID
       setFormErrors({});
       setMessage(null);
     }
   };
   
-  const deleteStudent = (admissionNoToDelete) => {
-    if (window.confirm(`Are you sure you want to delete student with Admission No: ${admissionNoToDelete}?`)) {
-      setStudents(prevStudents => prevStudents.filter(student => student.admissionNo !== admissionNoToDelete));
-      setMessage({ type: 'success', text: 'Student deleted successfully!' });
+  const deleteStudent = async (studentIdToDelete) => {
+    if (window.confirm(`Are you sure you want to delete student with Admission No: ${studentIdToDelete}?`)) {
+      const studentToDelete = students.find(s => s.admissionNo === studentIdToDelete);
+      if (!studentToDelete) {
+        setMessage({ type: 'error', text: 'Student not found.' });
+        return;
+      }
+      try {
+        const response = await fetch(`http://localhost:5000/api/schoolPortalStudents/${studentToDelete._id}`, {
+          method: 'DELETE',
+        });
+        if (response.ok) {
+          setStudents(prevStudents => prevStudents.filter(student => student.admissionNo !== studentIdToDelete));
+          setMessage({ type: 'success', text: 'Student deleted successfully!' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to delete student.' });
+        }
+      } catch (err) {
+        setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
+      }
     }
   };
   
@@ -470,7 +512,7 @@ function StudentManagement() {
             <tbody>
               {sortedStudents.length > 0 ? (
                 sortedStudents.map(student => (
-                <tr key={student.id}>
+                <tr key={student._id}>
                     <td>{student.admissionNo}</td>
                     <td>{student.firstName} {student.lastName}</td>
                     <td>{student.studentClass}</td>

@@ -13,7 +13,8 @@ function StudentPasswordChange() {
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [message, setMessage] = useState(''); // For success or error messages
 
-  const [students, setStudents] = useLocalStorage('schoolPortalStudents', []); // Access all students
+  // The hook is used here to get the full student list, not for direct password logic
+  const [students, setStudents] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -25,22 +26,12 @@ function StudentPasswordChange() {
     }
   }, [navigate]);
 
-  const handlePasswordChange = (e) => {
+  const handlePasswordChange = async (e) => {
     e.preventDefault();
     setMessage(''); // Clear previous messages
 
     if (!loggedInStudent) {
       setMessage('Error: Not logged in as a student.');
-      return;
-    }
-
-    // ⚠️ INSECURE: This password check is purely for demonstration.
-    // In a real app, this would be an API call to a backend that validates the old password.
-    // Our demo students are assumed to have '1234' as default password (from LoginPage.js simulation).
-    const currentStoredPassword = '1234'; // Simulated current password
-
-    if (oldPassword !== currentStoredPassword) {
-      setMessage('Incorrect old password.');
       return;
     }
 
@@ -54,26 +45,43 @@ function StudentPasswordChange() {
       return;
     }
 
-    // ⚠️ INSECURE: Updating password directly in localStorage.
-    // In a real app, you would send newPassword to a backend for hashing and storage.
-    const updatedStudents = students.map(s => {
-      if (s.admissionNo === loggedInStudent.admissionNo) {
-        // Assume we had a password field for student in localStorage,
-        // and we're updating it. For now, this is purely illustrative.
-        return { ...s, password: newPassword }; // This would be the hashed password in real app
+    try {
+      // Simulate sending data to a secure backend API
+      const response = await fetch(`http://localhost:5000/api/change-password/${loggedInStudent._id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ oldPassword, newPassword }),
+      });
+      
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage('Password changed successfully! You will be logged out. Please log in with your new password.');
+        
+        // Update local state and localStorage for consistency after a successful change
+        const updatedStudents = students.map(s => {
+          if (s.admissionNo === loggedInStudent.admissionNo) {
+            return { ...s, password: newPassword }; 
+          }
+          return s;
+        });
+        setStudents(updatedStudents); 
+        localStorage.setItem('loggedInUser', JSON.stringify({ ...loggedInStudent, password: newPassword }));
+
+        // Log out user after successful password change for security
+        setTimeout(() => {
+          handleLogout();
+        }, 2000);
+
+      } else {
+        setMessage(data.message || 'An error occurred during password change.');
       }
-      return s;
-    });
-
-    setStudents(updatedStudents); // Update global students state
-    // Also update loggedInUser in localStorage to reflect new password if you track it
-    localStorage.setItem('loggedInUser', JSON.stringify({ ...loggedInStudent, password: newPassword }));
-
-    setMessage('Password changed successfully! You will be logged out. Please log in with your new password.');
-    // Log out user after successful password change for security
-    setTimeout(() => {
-      handleLogout();
-    }, 2000);
+    } catch (error) {
+      console.error('Password change error:', error);
+      setMessage('An unexpected error occurred. Please check your network connection.');
+    }
   };
 
   const handleLogout = () => {

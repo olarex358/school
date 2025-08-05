@@ -8,9 +8,10 @@ function StudentResults() {
   const navigate = useNavigate();
 
   // Load all results and subjects to display student-specific results
-  const [allApprovedResults] = useLocalStorage('schoolPortalResults', []);
-  const [allSubjects] = useLocalStorage('schoolPortalSubjects', []);
-  const [allPendingResults] = useLocalStorage('schoolPortalPendingResults', []);
+  const [allApprovedResults, , loadingApprovedResults] = useLocalStorage('schoolPortalResults', [], 'http://localhost:5000/api/schoolPortalResults');
+  const [allSubjects, , loadingSubjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
+
+  const [studentSpecificResults, setStudentSpecificResults] = useState([]);
 
   // NEW STATE FOR GRADING LOGIC:
   const [totalScore, setTotalScore] = useState(0);
@@ -28,9 +29,17 @@ function StudentResults() {
   }, [navigate]);
 
   // Filter results to show only for the current logged-in student and ensure they are approved
-  const studentSpecificResults = allApprovedResults.filter(
-    result => result.studentNameSelect === loggedInStudent?.admissionNo && result.status === 'Approved'
-  );
+  useEffect(() => {
+    if (loggedInStudent && allApprovedResults.length > 0) {
+      const filteredResults = allApprovedResults.filter(
+        result => result.studentNameSelect === loggedInStudent.admissionNo && result.status === 'Approved'
+      );
+      setStudentSpecificResults(filteredResults);
+    } else {
+      setStudentSpecificResults([]);
+    }
+  }, [loggedInStudent, allApprovedResults]);
+
 
   // Helper function to get grade and GPA points from a score
   const getGradeAndPoints = (score) => {
@@ -91,7 +100,7 @@ function StudentResults() {
     navigate('/home');
   };
 
-  if (!loggedInStudent) {
+  if (!loggedInStudent || loadingApprovedResults || loadingSubjects) {
     return <div className="content-section">Loading results...</div>;
   }
 
@@ -135,7 +144,7 @@ function StudentResults() {
               {studentSpecificResults.map(result => {
                 const { total, grade } = calculateTotalAndGrade(result.firstCaScore, result.secondCaScore, result.assignmentScore, result.examScore);
                 return (
-                <tr key={result.id}>
+                <tr key={result._id}>
                   <td>{getSubjectName(result.subjectSelect)}</td>
                   <td>{result.termSelect}</td>
                   <td>{result.firstCaScore}</td>

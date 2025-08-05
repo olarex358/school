@@ -9,7 +9,7 @@ import useLocalStorage from '../hooks/useLocalStorage';
 function StaffSubjects() {
   const [loggedInStaff, setLoggedInStaff] = useState(null);
   // Load all subjects to display
-  const [allSubjects] = useLocalStorage('schoolPortalSubjects', []);
+  const [allSubjects, , loadingSubjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -27,7 +27,7 @@ function StaffSubjects() {
     navigate('/login');
   };
 
-  if (!loggedInStaff) {
+  if (!loggedInStaff || loadingSubjects) {
     return <div className="content-section">Loading staff subjects...</div>;
   }
 
@@ -48,7 +48,7 @@ function StaffSubjects() {
             </thead>
             <tbody>
               {allSubjects.map(subject => (
-                <tr key={subject.subjectCode}>
+                <tr key={subject._id}>
                   <td>{subject.subjectName}</td>
                   <td>{subject.subjectCode}</td>
                 </tr>

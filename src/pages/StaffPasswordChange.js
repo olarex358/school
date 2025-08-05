@@ -13,7 +13,7 @@ function StaffPasswordChange() {
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [message, setMessage] = useState(''); // For success or error messages
 
-  const [staffs, setStaffs] = useLocalStorage('schoolPortalStaff', []); // Access all staffs
+  const [staffs, setStaffs] = useLocalStorage('schoolPortalStaff', [], 'http://localhost:5000/api/schoolPortalStaff');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -25,21 +25,12 @@ function StaffPasswordChange() {
     }
   }, [navigate]);
 
-  const handlePasswordChange = (e) => {
+  const handlePasswordChange = async (e) => {
     e.preventDefault();
     setMessage(''); // Clear previous messages
 
     if (!loggedInStaff) {
       setMessage('Error: Not logged in as a staff member.');
-      return;
-    }
-
-    // ⚠️ INSECURE: This password check is purely for demonstration.
-    // Our demo staffs are assumed to have '1234' as default password (from LoginPage.js simulation).
-    const currentStoredPassword = '1234'; // Simulated current password
-
-    if (oldPassword !== currentStoredPassword) {
-      setMessage('Incorrect old password.');
       return;
     }
 
@@ -53,25 +44,43 @@ function StaffPasswordChange() {
       return;
     }
 
-    // ⚠️ INSECURE: Updating password directly in localStorage.
-    const updatedStaffs = staffs.map(s => {
-      if (s.staffId === loggedInStaff.staffId) {
-        // Assume we had a password field for staff in localStorage,
-        // and we're updating it. This is purely illustrative.
-        return { ...s, password: newPassword }; // This would be the hashed password in real app
+    try {
+      // Simulate sending data to a secure backend API
+      const response = await fetch(`http://localhost:5000/api/change-password/${loggedInStaff._id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ oldPassword, newPassword }),
+      });
+      
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage('Password changed successfully! You will be logged out. Please log in with your new password.');
+        
+        // Update local state and localStorage for consistency after a successful change
+        const updatedStaffs = staffs.map(s => {
+          if (s.staffId === loggedInStaff.staffId) {
+            return { ...s, password: newPassword }; 
+          }
+          return s;
+        });
+        setStaffs(updatedStaffs); 
+        localStorage.setItem('loggedInUser', JSON.stringify({ ...loggedInStaff, password: newPassword }));
+
+        // Log out user after successful password change for security
+        setTimeout(() => {
+          handleLogout();
+        }, 2000);
+
+      } else {
+        setMessage(data.message || 'An error occurred during password change.');
       }
-      return s;
-    });
-
-    setStaffs(updatedStaffs); // Update global staffs state
-    // Also update loggedInUser in localStorage to reflect new password
-    localStorage.setItem('loggedInUser', JSON.stringify({ ...loggedInStaff, password: newPassword }));
-
-    setMessage('Password changed successfully! You will be logged out. Please log in with your new password.');
-    // Log out user after successful password change for security
-    setTimeout(() => {
-      handleLogout();
-    }, 2000);
+    } catch (error) {
+      console.error('Password change error:', error);
+      setMessage('An unexpected error occurred. Please check your network connection.');
+    }
   };
 
   const handleLogout = () => {

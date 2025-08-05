@@ -11,7 +11,7 @@ function StudentAttendance() {
   const navigate = useNavigate();
 
   // Load all attendance records
-  const [allAttendanceRecords] = useLocalStorage('schoolPortalAttendance', []);
+  const [allAttendanceRecords, , loadingAttendance] = useLocalStorage('schoolPortalAttendance', [], 'http://localhost:5000/api/schoolPortalAttendance');
 
   // State to store filtered attendance for the student
   const [studentAttendance, setStudentAttendance] = useState([]);
@@ -85,7 +85,7 @@ function StudentAttendance() {
     navigate('/login');
   };
 
-  if (!loggedInStudent) {
+  if (!loggedInStudent || loadingAttendance) {
     return <div className="content-section">Loading attendance records...</div>;
   }
 
@@ -122,7 +122,7 @@ function StudentAttendance() {
             </thead>
             <tbody>
               {studentAttendance.map(record => (
-                <tr key={record.id}>
+                <tr key={record._id}>
                   <td>{record.date}</td>
                   <td>{record.class}</td>
                   <td style={{ color: record.status === 'Present' ? 'green' : record.status === 'Absent' ? 'red' : 'orange' }}>

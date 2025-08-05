@@ -81,41 +81,57 @@ function AdminTimetableManagement() {
     setMessage(null);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage(null);
     if (!validateForm()) {
       setMessage({ type: 'error', text: 'Please correct the errors in the form.' });
       return;
     }
+    
     const entryToAddOrUpdate = {
       ...timetableForm,
-      id: isEditing ? editEntryId : Date.now(),
       timestamp: new Date().toISOString()
     };
-    const isOverlap = timetableEntries.some(entry =>
-      entry.id !== entryToAddOrUpdate.id &&
-      entry.classSelect === entryToAddOrUpdate.classSelect &&
-      entry.day === entryToAddOrUpdate.day &&
-      (
-        (entryToAddOrUpdate.startTime < entry.endTime && entryToAddOrUpdate.endTime > entry.startTime)
-      )
-    );
-    if (isOverlap) {
-      setMessage({ type: 'error', text: 'This timetable entry overlaps with an existing entry for the same class and day. Please adjust times.' });
-      return;
+    
+    try {
+      if (isEditing) {
+        const response = await fetch(`http://localhost:5000/api/schoolPortalTimetables/${editEntryId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(entryToAddOrUpdate),
+        });
+        if (response.ok) {
+          const updatedEntry = await response.json();
+          setTimetableEntries(prevEntries =>
+            prevEntries.map(entry =>
+              entry._id === updatedEntry._id ? updatedEntry : entry
+            )
+          );
+          setMessage({ type: 'success', text: 'Timetable entry updated successfully!' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to update timetable entry.' });
+        }
+      } else {
+        const response = await fetch('http://localhost:5000/api/schoolPortalTimetables', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(entryToAddOrUpdate),
+        });
+        if (response.ok) {
+          const newEntry = await response.json();
+          setTimetableEntries(prevEntries => [...prevEntries, newEntry]);
+          setMessage({ type: 'success', text: 'New timetable entry added successfully!' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to add new timetable entry.' });
+        }
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
     }
-    if (isEditing) {
-      setTimetableEntries(prevEntries =>
-        prevEntries.map(entry =>
-          entry.id === editEntryId ? entryToAddOrUpdate : entry
-        )
-      );
-      setMessage({ type: 'success', text: 'Timetable entry updated successfully!' });
-    } else {
-      setTimetableEntries(prevEntries => [...prevEntries, entryToAddOrUpdate]);
-      setMessage({ type: 'success', text: 'New timetable entry added successfully!' });
-    }
+    
     setTimetableForm({
       classSelect: '',
       subjectSelect: '',
@@ -132,7 +148,7 @@ function AdminTimetableManagement() {
   };
 
   const editEntry = (idToEdit) => {
-    const entry = timetableEntries.find(e => e.id === idToEdit);
+    const entry = timetableEntries.find(e => e._id === idToEdit);
     if (entry) {
       setTimetableForm(entry);
       setIsEditing(true);
@@ -142,10 +158,22 @@ function AdminTimetableManagement() {
     }
   };
 
-  const deleteEntry = (idToDelete) => {
+  const deleteEntry = async (idToDelete) => {
     if (window.confirm('Are you sure you want to delete this timetable entry?')) {
-      setTimetableEntries(prevEntries => prevEntries.filter(entry => entry.id !== idToDelete));
-      setMessage({ type: 'success', text: 'Timetable entry deleted successfully!' });
+      try {
+        const response = await fetch(`http://localhost:5000/api/schoolPortalTimetables/${idToDelete}`, {
+          method: 'DELETE',
+        });
+        if (response.ok) {
+          setTimetableEntries(prevEntries => prevEntries.filter(entry => entry._id !== idToDelete));
+          setMessage({ type: 'success', text: 'Timetable entry deleted successfully!' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to delete timetable entry.' });
+        }
+      } catch (err) {
+        setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
+      }
     }
   };
 
@@ -358,7 +386,7 @@ function AdminTimetableManagement() {
             <tbody>
               {filteredEntries.length > 0 ? (
                 filteredEntries.map(entry => (
-                  <tr key={entry.id}>
+                  <tr key={entry._id}>
                     <td>{entry.classSelect}</td>
                     <td>{getSubjectName(entry.subjectSelect)}</td>
                     <td>{getTeacherName(entry.teacherSelect)}</td>
@@ -367,8 +395,8 @@ function AdminTimetableManagement() {
                     <td>{`${entry.startTime} - ${entry.endTime}`}</td>
                     <td>{entry.location}</td>
                     <td>
-                      <button className="action-btn edit-btn" onClick={() => editEntry(entry.id)}>Edit</button>
-                      <button className="action-btn delete-btn" onClick={() => deleteEntry(entry.id)}>Delete</button>
+                      <button className="action-btn edit-btn" onClick={() => editEntry(entry._id)}>Edit</button>
+                      <button className="action-btn delete-btn" onClick={() => deleteEntry(entry._id)}>Delete</button>
                     </td>
                   </tr>
                 ))

@@ -13,7 +13,7 @@ function UserPermissionsManagement() {
   });
   const [submitButtonText, setSubmitButtonText] = useState('Add User');
   const [isEditing, setIsEditing] = useState(false);
-  const [editUsername, setEditUsername] = useState(null);
+  const [editUserId, setEditUserId] = useState(null); // To store the MongoDB _id
   const [searchTerm, setSearchTerm] = useState('');
 
   const handleChange = (e) => {
@@ -24,27 +24,51 @@ function UserPermissionsManagement() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!newUser.username || !newUser.password || !newUser.role) {
       alert('Please fill in all required fields.');
       return;
     }
-    if (isEditing) {
-      setUsers(prevUsers =>
-        prevUsers.map(user =>
-          user.username === editUsername ? { ...newUser } : user
-        )
-      );
-      alert('User data updated successfully!');
-    } else {
-      if (users.some(u => u.username.toLowerCase() === newUser.username.toLowerCase())) {
-        alert('A user with this username already exists. Please choose a different username.');
-        return;
-      }
-      setUsers(prevUsers => [...prevUsers, newUser]);
-      alert('New user added successfully!');
+    try {
+        if (isEditing) {
+            // Send PUT request to update
+            const response = await fetch(`http://localhost:5000/api/schoolPortalUsers/${editUserId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newUser),
+            });
+            if (response.ok) {
+                const updatedUser = await response.json();
+                setUsers(prevUsers =>
+                    prevUsers.map(user => (user._id === updatedUser._id ? updatedUser : user))
+                );
+                alert('User data updated successfully!');
+            } else {
+                const errorData = await response.json();
+                alert(errorData.message || 'Failed to update user.');
+            }
+        } else {
+            // Send POST request to create
+            const response = await fetch('http://localhost:5000/api/schoolPortalUsers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newUser),
+            });
+            if (response.ok) {
+                const createdUser = await response.json();
+                setUsers(prevUsers => [...prevUsers, createdUser]);
+                alert('New user added successfully!');
+            } else {
+                const errorData = await response.json();
+                alert(errorData.message || 'Failed to add new user.');
+            }
+        }
+    } catch (err) {
+        alert('An unexpected error occurred. Please check your network connection.');
     }
+
+    // Reset form
     setNewUser({
       username: '',
       password: '',
@@ -52,7 +76,7 @@ function UserPermissionsManagement() {
     });
     setSubmitButtonText('Add User');
     setIsEditing(false);
-    setEditUsername(null);
+    setEditUserId(null);
   };
 
   const editUser = (usernameToEdit) => {
@@ -61,14 +85,31 @@ function UserPermissionsManagement() {
       setNewUser(userToEdit);
       setSubmitButtonText('Update User');
       setIsEditing(true);
-      setEditUsername(usernameToEdit);
+      setEditUserId(userToEdit._id); // Store the MongoDB _id
     }
   };
 
-  const deleteUser = (usernameToDelete) => {
+  const deleteUser = async (usernameToDelete) => {
     if (window.confirm(`Are you sure you want to delete user: ${usernameToDelete}?`)) {
-      setUsers(prevUsers => prevUsers.filter(user => user.username !== usernameToDelete));
-      alert('User deleted successfully!');
+        const userToDelete = users.find(u => u.username === usernameToDelete);
+        if (!userToDelete) {
+            alert('User not found.');
+            return;
+        }
+        try {
+            const response = await fetch(`http://localhost:5000/api/schoolPortalUsers/${userToDelete._id}`, {
+                method: 'DELETE',
+            });
+            if (response.ok) {
+                setUsers(prevUsers => prevUsers.filter(user => user.username !== usernameToDelete));
+                alert('User deleted successfully!');
+            } else {
+                const errorData = await response.json();
+                alert(errorData.message || 'Failed to delete user.');
+            }
+        } catch (err) {
+            alert('An unexpected error occurred. Please check your network connection.');
+        }
     }
   };
 
@@ -85,7 +126,7 @@ function UserPermissionsManagement() {
     });
     setSubmitButtonText('Add User');
     setIsEditing(false);
-    setEditUsername(null);
+    setEditUserId(null);
   };
 
   const filteredUsers = users.filter(user =>

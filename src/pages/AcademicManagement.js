@@ -12,6 +12,7 @@ function AcademicManagement() {
   });
   const [submitButtonText, setSubmitButtonText] = useState('Add Subject');
   const [isEditing, setIsEditing] = useState(false);
+  const [editSubjectId, setEditSubjectId] = useState(null); // To store the MongoDB _id
   const [searchTerm, setSearchTerm] = useState('');
 
   const handleChange = (e) => {
@@ -22,33 +23,59 @@ function AcademicManagement() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!newSubject.subjectName || !newSubject.subjectCode) {
       alert('Please fill in all required fields.');
       return;
     }
-    if (isEditing) {
-      setSubjects(prevSubjects =>
-        prevSubjects.map(subject =>
-          subject.subjectCode === newSubject.subjectCode ? { ...newSubject } : subject
-        )
-      );
-      alert('Subject data updated successfully!');
-    } else {
-      if (subjects.some(s => s.subjectCode.toLowerCase() === newSubject.subjectCode.toLowerCase())) {
-        alert('A subject with this code already exists. Please use a unique code.');
-        return;
-      }
-      setSubjects(prevSubjects => [...prevSubjects, newSubject]);
-      alert('New subject added successfully!');
+
+    try {
+        if (isEditing) {
+            // Send PUT request to update
+            const response = await fetch(`http://localhost:5000/api/schoolPortalSubjects/${editSubjectId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newSubject),
+            });
+            if (response.ok) {
+                const updatedSubject = await response.json();
+                setSubjects(prevSubjects =>
+                    prevSubjects.map(sub => (sub._id === updatedSubject._id ? updatedSubject : sub))
+                );
+                alert('Subject data updated successfully!');
+            } else {
+                const errorData = await response.json();
+                alert(errorData.message || 'Failed to update subject.');
+            }
+        } else {
+            // Send POST request to create
+            const response = await fetch('http://localhost:5000/api/schoolPortalSubjects', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newSubject),
+            });
+            if (response.ok) {
+                const createdSubject = await response.json();
+                setSubjects(prevSubjects => [...prevSubjects, createdSubject]);
+                alert('New subject added successfully!');
+            } else {
+                const errorData = await response.json();
+                alert(errorData.message || 'Failed to add new subject.');
+            }
+        }
+    } catch (err) {
+        alert('An unexpected error occurred. Please check your network connection.');
     }
+
+    // Reset form
     setNewSubject({
       subjectName: '',
       subjectCode: ''
     });
     setSubmitButtonText('Add Subject');
     setIsEditing(false);
+    setEditSubjectId(null);
   };
 
   const editSubject = (subjectCodeToEdit) => {
@@ -57,13 +84,31 @@ function AcademicManagement() {
       setNewSubject(subjectToEdit);
       setSubmitButtonText('Update Subject');
       setIsEditing(true);
+      setEditSubjectId(subjectToEdit._id); // Store the MongoDB _id
     }
   };
 
-  const deleteSubject = (subjectCodeToDelete) => {
+  const deleteSubject = async (subjectCodeToDelete) => {
     if (window.confirm(`Are you sure you want to delete subject: ${subjectCodeToDelete}?`)) {
-      setSubjects(prevSubjects => prevSubjects.filter(subject => subject.subjectCode !== subjectCodeToDelete));
-      alert('Subject deleted successfully!');
+        const subjectToDelete = subjects.find(s => s.subjectCode === subjectCodeToDelete);
+        if (!subjectToDelete) {
+            alert('Subject not found.');
+            return;
+        }
+        try {
+            const response = await fetch(`http://localhost:5000/api/schoolPortalSubjects/${subjectToDelete._id}`, {
+                method: 'DELETE',
+            });
+            if (response.ok) {
+                setSubjects(prevSubjects => prevSubjects.filter(subject => subject.subjectCode !== subjectCodeToDelete));
+                alert('Subject deleted successfully!');
+            } else {
+                const errorData = await response.json();
+                alert(errorData.message || 'Failed to delete subject.');
+            }
+        } catch (err) {
+            alert('An unexpected error occurred. Please check your network connection.');
+        }
     }
   };
 
@@ -79,6 +124,7 @@ function AcademicManagement() {
     });
     setSubmitButtonText('Add Subject');
     setIsEditing(false);
+    setEditSubjectId(null);
   };
 
   const filteredSubjects = subjects.filter(subject =>
@@ -130,7 +176,7 @@ function AcademicManagement() {
         <ul id="subjectList">
           {filteredSubjects.length > 0 ? (
             filteredSubjects.map(subject => (
-              <li key={subject.subjectCode}>
+              <li key={subject._id}>
                 <strong>{subject.subjectName}</strong> ({subject.subjectCode})
                 <span>
                   <button

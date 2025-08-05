@@ -8,8 +8,8 @@ function StudentCertificationRegistration() {
   const [loggedInStudent, setLoggedInStudent] = useState(null);
 
   // Data from localStorage
-  const [subjects] = useLocalStorage('schoolPortalSubjects', []);
-  const [certRegistrations, setCertRegistrations] = useLocalStorage('schoolPortalCertificationRegistrations', []);
+  const [subjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
+  const [certRegistrations, setCertRegistrations, loadingRegs] = useLocalStorage('schoolPortalCertificationRegistrations', [], 'http://localhost:5000/api/schoolPortalCertificationRegistrations');
 
   // Form state
   const [registrationForm, setRegistrationForm] = useState({
@@ -35,9 +35,14 @@ function StudentCertificationRegistration() {
     setMessage(null);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage(null);
+
+    if (!registrationForm.subjectCode || !registrationForm.examDate) {
+        setMessage({ type: 'error', text: 'Please select a subject and exam date.' });
+        return;
+    }
 
     const newRegistration = {
       ...registrationForm,
@@ -52,9 +57,24 @@ function StudentCertificationRegistration() {
       setMessage({ type: 'error', text: 'You are already registered for this certification exam.' });
       return;
     }
-
-    setCertRegistrations(prev => [...prev, newRegistration]);
-    setMessage({ type: 'success', text: 'Successfully registered for the certification exam!' });
+    
+    try {
+        const response = await fetch('http://localhost:5000/api/schoolPortalCertificationRegistrations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newRegistration),
+        });
+        if (response.ok) {
+            const createdRegistration = await response.json();
+            setCertRegistrations(prev => [...prev, createdRegistration]);
+            setMessage({ type: 'success', text: 'Successfully registered for the certification exam!' });
+        } else {
+            const errorData = await response.json();
+            setMessage({ type: 'error', text: errorData.message || 'Failed to register for the exam.' });
+        }
+    } catch (err) {
+        setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
+    }
 
     // Reset form
     setRegistrationForm({
@@ -70,7 +90,7 @@ function StudentCertificationRegistration() {
 
   const studentRegistrations = certRegistrations.filter(reg => reg.studentAdmissionNo === loggedInStudent?.admissionNo);
 
-  if (!loggedInStudent) {
+  if (!loggedInStudent || loadingRegs) {
     return <div className="content-section">Access Denied. Please log in as a Student.</div>;
   }
 
@@ -97,7 +117,7 @@ function StudentCertificationRegistration() {
             >
               <option value="">-- Select Subject --</option>
               {subjects.map(subject => (
-                <option key={subject.subjectCode} value={subject.subjectCode}>
+                <option key={subject._id} value={subject.subjectCode}>
                   {getSubjectName(subject.subjectCode)}
                 </option>
               ))}
@@ -131,7 +151,7 @@ function StudentCertificationRegistration() {
             <tbody>
               {studentRegistrations.length > 0 ? (
                 studentRegistrations.map(reg => (
-                  <tr key={reg.id}>
+                  <tr key={reg._id}>
                     <td>{getSubjectName(reg.subjectCode)}</td>
                     <td>{reg.examDate}</td>
                     <td>{reg.status}</td>

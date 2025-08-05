@@ -10,7 +10,8 @@ function StudentSyllabus() {
   const [loggedInStudent, setLoggedInStudent] = useState(null);
   const navigate = useNavigate();
   // Load syllabus entries
-  const [allSyllabusEntries] = useLocalStorage('schoolPortalSyllabusEntries', []);
+  const [allSyllabusEntries, , loadingSyllabus] = useLocalStorage('schoolPortalSyllabusEntries', [], 'http://localhost:5000/api/schoolPortalSyllabusEntries');
+  const [subjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('loggedInUser'));
@@ -36,6 +37,14 @@ function StudentSyllabus() {
     (entry.applicableClass === 'all' || entry.applicableClass === loggedInStudent.studentClass)
   ).sort((a, b) => a.applicableClass.localeCompare(b.applicableClass) || a.applicableSubject.localeCompare(b.applicableSubject));
 
+  const getSubjectName = (subjectCode) => {
+    const subject = subjects.find(s => s.subjectCode === subjectCode);
+    return subject ? subject.subjectName : subjectCode;
+  };
+
+  if (!loggedInStudent || loadingSyllabus) {
+    return <div className="content-section">Loading syllabus...</div>;
+  }
 
   return (
     <div className="content-section">
@@ -44,13 +53,13 @@ function StudentSyllabus() {
 
       {studentRelevantSyllabus.length > 0 ? (
         studentRelevantSyllabus.map(entry => (
-          <div key={entry.id} style={{ border: '1px solid #ccc', padding: '15px', marginBottom: '15px', borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
+          <div key={entry._id} style={{ border: '1px solid #ccc', padding: '15px', marginBottom: '15px', borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
               <img src={syllabusIcon} alt="Syllabus Icon" width="40px" height="40px" style={{ marginRight: '15px', flexShrink: 0 }} />
               <div>
                 <h3>{entry.title}</h3>
                 <p><strong>Class:</strong> {entry.applicableClass === 'all' ? 'All Classes' : entry.applicableClass}</p>
-                <p><strong>Subject:</strong> {entry.applicableSubject === 'all' ? 'All Subjects' : entry.applicableSubject}</p>
+                <p><strong>Subject:</strong> {entry.applicableSubject === 'all' ? 'All Subjects' : getSubjectName(entry.applicableSubject)}</p>
                 <p style={{ marginTop: '5px' }}>{entry.description.substring(0, 150)}...</p>
               </div>
             </div>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useLocalStorage from '../hooks/useLocalStorage';
@@ -9,7 +8,7 @@ function StudentFees() {
   const [loggedInStudent, setLoggedInStudent] = useState(null);
 
   // Data from localStorage
-  const [allFeeRecords] = useLocalStorage('schoolPortalFeeRecords', []);
+  const [allFeeRecords, , loadingFees] = useLocalStorage('schoolPortalFeeRecords', [], 'http://localhost:5000/api/schoolPortalFeeRecords');
 
   // State for calculated stats
   const [studentFeeRecords, setStudentFeeRecords] = useState([]);
@@ -88,7 +87,7 @@ function StudentFees() {
     alert('Invoice generated and sent to a virtual printer.');
   };
 
-  if (!loggedInStudent) {
+  if (!loggedInStudent || loadingFees) {
     return <div className="content-section">Loading fee details...</div>;
   }
 
@@ -132,7 +131,7 @@ function StudentFees() {
               </thead>
               <tbody>
                 {studentFeeRecords.map(rec => (
-                  <tr key={rec.id}>
+                  <tr key={rec._id}>
                     <td>{rec.feeType}</td>
                     <td>₦{rec.amount.toLocaleString()}</td>
                     <td>{rec.dueDate}</td>

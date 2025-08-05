@@ -12,9 +12,9 @@ function StaffTimetable() {
 
   // Load all timetable entries, subjects, and staff (for teacher names)
   // NOW CORRECTLY READING FROM PLURAL KEY: 'schoolPortalTimetables'
-  const [allTimetableEntries] = useLocalStorage('schoolPortalTimetables', []);
-  const [subjects] = useLocalStorage('schoolPortalSubjects', []);
-  const [staffs] = useLocalStorage('schoolPortalStaff', []); // For getting staff details
+  const [allTimetableEntries, , loadingTimetable] = useLocalStorage('schoolPortalTimetables', [], 'http://localhost:5000/api/schoolPortalTimetables');
+  const [subjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
+  const [staffs] = useLocalStorage('schoolPortalStaff', [], 'http://localhost:5000/api/schoolPortalStaff');
 
   const [staffSpecificTimetable, setStaffSpecificTimetable] = useState([]);
   const [daysOfWeek] = useState(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]);
@@ -77,10 +77,10 @@ function StaffTimetable() {
 
   const handleLogout = () => {
     localStorage.removeItem('loggedInUser');
-    navigate('/login');
+    navigate('/home');
   };
 
-  if (!loggedInStaff) {
+  if (!loggedInStaff || loadingTimetable) {
     return <div className="content-section">Loading staff timetable...</div>;
   }
 

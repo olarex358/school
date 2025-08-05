@@ -3,15 +3,21 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useLocalStorage from '../hooks/useLocalStorage';
 
+// Import a generic library icon for the card
+import libraryIcon from '../icon/library.png'
+
 function UserDigitalLibrary() {
   const navigate = useNavigate();
   const [loggedInUser, setLoggedInUser] = useState(null);
-
-  // Data from localStorage
-  const [allDigitalResources] = useLocalStorage('schoolPortalDigitalLibrary', []);
+  
+  // Load digital resources, students, and subjects from backend
+  const [digitalResources, , loadingResources] = useLocalStorage('schoolPortalDigitalLibrary', [], 'http://localhost:5000/api/schoolPortalDigitalLibrary');
+  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
+  
+  const [userResources, setUserResources] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Protect the route
+  // Protect the route and filter resources
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('loggedInUser'));
     if (user && (user.type === 'student' || user.type === 'staff')) {
@@ -21,35 +27,49 @@ function UserDigitalLibrary() {
     }
   }, [navigate]);
 
-  // Derived state: Filter resources based on user role and class
-  const userRelevantResources = allDigitalResources.filter(resource => {
-    // Check if the user is in the correct audience
-    const isCorrectAudience = resource.audience === 'all' || resource.audience === loggedInUser?.type;
-    
-    // Check if the user is in the correct class
-    const isCorrectClass = resource.applicableClass === 'all' || resource.applicableClass === loggedInUser?.studentClass;
+  useEffect(() => {
+    if (loggedInUser && digitalResources.length > 0) {
+      const filteredForUser = digitalResources.filter(resource => {
+        // First filter by general audience type (all or specific user type)
+        const isCorrectAudience = resource.audience === 'all' || resource.audience === loggedInUser.type;
+        
+        // Then, if it's for students, check if the class matches
+        if (loggedInUser.type === 'student' && loggedInUser.studentClass) {
+          const isCorrectClass = resource.applicableClass === 'all' || resource.applicableClass === loggedInUser.studentClass;
+          return isCorrectAudience && isCorrectClass;
+        }
 
-    return isCorrectAudience && isCorrectClass;
-  });
+        // For staff, no further filtering is applied for now
+        return isCorrectAudience;
+      }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      
+      setUserResources(filteredForUser);
+    } else {
+      setUserResources([]);
+    }
+  }, [loggedInUser, digitalResources]);
 
-  // Filter resources based on search term
-  const filteredResources = userRelevantResources.filter(res =>
+  const handleLogout = () => {
+    localStorage.removeItem('loggedInUser');
+    navigate('/home');
+  };
+
+  const filteredAndSearchedResources = userResources.filter(res =>
     res.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     res.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
     res.filename.toLowerCase().includes(searchTerm.toLowerCase())
-  ).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)); // Sort by newest first
+  );
 
-  if (!loggedInUser) {
-    return <div className="content-section">Access Denied. Please log in as a Student or Staff member.</div>;
+  if (!loggedInUser || loadingResources) {
+    return <div className="content-section">Loading digital library...</div>;
   }
-
+  
   return (
     <div className="content-section">
       <h1>Digital Library</h1>
-      <p>Welcome, {loggedInUser.firstName || loggedInUser.firstname}! Here are the digital resources available to you.</p>
-      
+      <p>Welcome, {loggedInUser.type === 'student' ? loggedInUser.firstName : loggedInUser.firstname}! Here are the digital resources available to you:</p>
+
       <div className="sub-section">
-        <h2>Available Resources</h2>
         <input
           type="text"
           placeholder="Search resources..."
@@ -57,38 +77,33 @@ function UserDigitalLibrary() {
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{ width: '100%', padding: '8px', marginBottom: '15px' }}
         />
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Title</th>
-                <th>Description</th>
-                <th>File</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredResources.length > 0 ? (
-                filteredResources.map(res => (
-                  <tr key={res.id}>
-                    <td>{res.title}</td>
-                    <td>{res.description}</td>
-                    <td>
-                      <a href="#" onClick={(e) => { e.preventDefault(); alert(`Simulating download of ${res.filename}`); }}>
-                        {res.filename}
-                      </a>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="3">No digital resources found for you.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        {filteredAndSearchedResources.length > 0 ? (
+          <div className="cards-container">
+            {filteredAndSearchedResources.map(res => (
+              <div key={res._id} className="card-item-container">
+                <div className="card-item-icon">
+                    <img src={libraryIcon} alt="Resource Icon" width="50px" height="50px" />
+                </div>
+                <div className="card-item-content">
+                    <h4>{res.title}</h4>
+                    <p>{res.description}</p>
+                    <a href="#" onClick={(e) => { e.preventDefault(); alert(`Simulating download of ${res.filename}`); }}>
+                        Download: {res.filename}
+                    </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p>No digital resources match your search or are currently available.</p>
+        )}
       </div>
-      <button onClick={() => navigate(-1)} style={{ marginTop: '20px' }}>Back</button>
+
+      <p style={{ marginTop: '20px' }}>
+        If you have questions about any of the resources, please contact the school administration.
+      </p>
+
+      <button onClick={handleLogout} style={{ marginTop: '20px' }}>Logout</button>
     </div>
   );
 }

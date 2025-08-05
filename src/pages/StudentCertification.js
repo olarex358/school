@@ -9,8 +9,8 @@ function StudentCertification() {
   const [loggedInStudent, setLoggedInStudent] = useState(null);
 
   // Data from localStorage
-  const [certificationResults] = useLocalStorage('schoolPortalCertificationResults', []);
-  const [allSubjects] = useLocalStorage('schoolPortalSubjects', []);
+  const [certificationResults, , loadingCertResults] = useLocalStorage('schoolPortalCertificationResults', [], 'http://localhost:5000/api/schoolPortalCertificationResults');
+  const [allSubjects, , loadingSubjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
   const [studentSpecificResults, setStudentSpecificResults] = useState([]);
 
   // Protect the route and filter results
@@ -69,7 +69,7 @@ function StudentCertification() {
     navigate('/home');
   };
 
-  if (!loggedInStudent) {
+  if (!loggedInStudent || loadingCertResults || loadingSubjects) {
     return <div className="content-section">Loading certification details...</div>;
   }
 
@@ -97,7 +97,7 @@ function StudentCertification() {
               {studentSpecificResults.map(res => {
                 const { grade, qualified } = calculateGradeAndQualification(res.totalScore);
                 return (
-                  <tr key={res.id}>
+                  <tr key={res._id}>
                     <td>{getSubjectName(res.subjectCode)}</td>
                     <td>{res.date}</td>
                     <td>{res.objScore}</td>

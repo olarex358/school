@@ -8,9 +8,9 @@ function AdminCertificationManagement() {
   const [loggedInAdmin, setLoggedInAdmin] = useState(null);
 
   // Data from localStorage
-  const [certificationResults, setCertificationResults] = useLocalStorage('schoolPortalCertificationResults', []);
-  const [students] = useLocalStorage('schoolPortalStudents', []);
-  const [subjects] = useLocalStorage('schoolPortalSubjects', []);
+  const [certificationResults, setCertificationResults] = useLocalStorage('schoolPortalCertificationResults', [], 'http://localhost:5000/api/schoolPortalCertificationResults');
+  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
+  const [subjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
 
   // Form states
   const [resultForm, setResultForm] = useState({
@@ -106,7 +106,7 @@ function AdminCertificationManagement() {
     setMessage(null);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage(null);
 
@@ -121,21 +121,46 @@ function AdminCertificationManagement() {
 
     const resultToAddOrUpdate = {
       ...resultForm,
-      id: isEditing ? editResultId : Date.now(),
       totalScore: totalScore,
       grade: grade,
       qualified: qualified,
       timestamp: new Date().toISOString(),
     };
-
-    if (isEditing) {
-      setCertificationResults(prev =>
-        prev.map(res => (res.id === editResultId ? resultToAddOrUpdate : res))
-      );
-      setMessage({ type: 'success', text: 'Certification result updated successfully!' });
-    } else {
-      setCertificationResults(prev => [...prev, resultToAddOrUpdate]);
-      setMessage({ type: 'success', text: 'New certification result added successfully!' });
+    
+    try {
+      if (isEditing) {
+        const response = await fetch(`http://localhost:5000/api/schoolPortalCertificationResults/${editResultId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(resultToAddOrUpdate),
+        });
+        if (response.ok) {
+          const updatedResult = await response.json();
+          setCertificationResults(prev =>
+            prev.map(res => (res._id === updatedResult._id ? updatedResult : res))
+          );
+          setMessage({ type: 'success', text: 'Certification result updated successfully!' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to update certification result.' });
+        }
+      } else {
+        const response = await fetch('http://localhost:5000/api/schoolPortalCertificationResults', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(resultToAddOrUpdate),
+        });
+        if (response.ok) {
+          const newResult = await response.json();
+          setCertificationResults(prev => [...prev, newResult]);
+          setMessage({ type: 'success', text: 'New certification result added successfully!' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to add new certification result.' });
+        }
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
     }
 
     // Reset form
@@ -156,7 +181,7 @@ function AdminCertificationManagement() {
   };
 
   const editResult = (idToEdit) => {
-    const result = certificationResults.find(res => res.id === idToEdit);
+    const result = certificationResults.find(res => res._id === idToEdit);
     if (result) {
       setResultForm(result);
       setIsEditing(true);
@@ -166,10 +191,22 @@ function AdminCertificationManagement() {
     }
   };
 
-  const deleteResult = (idToDelete) => {
+  const deleteResult = async (idToDelete) => {
     if (window.confirm('Are you sure you want to delete this result?')) {
-      setCertificationResults(prev => prev.filter(res => res.id !== idToDelete));
-      setMessage({ type: 'success', text: 'Certification result deleted successfully!' });
+      try {
+        const response = await fetch(`http://localhost:5000/api/schoolPortalCertificationResults/${idToDelete}`, {
+          method: 'DELETE',
+        });
+        if (response.ok) {
+          setCertificationResults(prev => prev.filter(res => res._id !== idToDelete));
+          setMessage({ type: 'success', text: 'Certification result deleted successfully!' });
+        } else {
+          const errorData = await response.json();
+          setMessage({ type: 'error', text: errorData.message || 'Failed to delete certification result.' });
+        }
+      } catch (err) {
+        setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
+      }
     }
   };
 
@@ -223,7 +260,7 @@ function AdminCertificationManagement() {
             >
               <option value="">-- Select Student --</option>
               {students.map(student => (
-                <option key={student.admissionNo} value={student.admissionNo}>
+                <option key={student._id} value={student.admissionNo}>
                   {getStudentName(student.admissionNo)}
                 </option>
               ))}
@@ -243,7 +280,7 @@ function AdminCertificationManagement() {
             >
               <option value="">-- Select Subject --</option>
               {subjects.map(subject => (
-                <option key={subject.subjectCode} value={subject.subjectCode}>{getSubjectName(subject.subjectCode)}</option>
+                <option key={subject._id} value={subject.subjectCode}>{getSubjectName(subject.subjectCode)}</option>
               ))}
             </select>
             {formErrors.subjectCode && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.subjectCode}</p>}
@@ -343,7 +380,7 @@ function AdminCertificationManagement() {
             <tbody>
               {filteredResults.length > 0 ? (
                 filteredResults.map(res => (
-                  <tr key={res.id}>
+                  <tr key={res._id}>
                     <td>{res.studentAdmissionNo}</td>
                     <td>{getStudentName(res.studentAdmissionNo)}</td>
                     <td>{getSubjectName(res.subjectCode)}</td>
@@ -355,8 +392,8 @@ function AdminCertificationManagement() {
                     <td style={{color: res.qualified ? 'green' : 'red'}}><strong>{res.grade}</strong></td>
                     <td style={{color: res.qualified ? 'green' : 'red'}}>{res.qualified ? 'Yes' : 'No'}</td>
                     <td>
-                      <button className="action-btn edit-btn" onClick={() => editResult(res.id)}>Edit</button>
-                      <button className="action-btn delete-btn" onClick={() => deleteResult(res.id)}>Delete</button>
+                      <button className="action-btn edit-btn" onClick={() => editResult(res._id)}>Edit</button>
+                      <button className="action-btn delete-btn" onClick={() => deleteResult(res._id)}>Delete</button>
                     </td>
                   </tr>
                 ))

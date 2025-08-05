@@ -9,9 +9,9 @@ function AdminMessaging() {
   const [loggedInAdmin, setLoggedInAdmin] = useState(null);
 
   // Update hooks to get data from the backend
-  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/students');
-  const [staffs] = useLocalStorage('schoolPortalStaff', [], 'http://localhost:5000/api/staffs');
-  const [adminMessages, setAdminMessages, loadingMessages] = useLocalStorage('schoolPortalAdminMessages', [], 'http://localhost:5000/api/adminMessages');
+  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
+  const [staffs] = useLocalStorage('schoolPortalStaff', [], 'http://localhost:5000/api/schoolPortalStaff');
+  const [adminMessages, setAdminMessages, loadingMessages] = useLocalStorage('schoolPortalAdminMessages', [], 'http://localhost:5000/api/schoolPortalAdminMessages');
   const { addNotification } = useNotifications();
 
   // Form states
@@ -51,7 +51,7 @@ function AdminMessaging() {
     return Object.keys(errors).length === 0;
   };
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
     setMessage(null);
     if (!validateForm()) {
@@ -59,7 +59,6 @@ function AdminMessaging() {
       return;
     }
     const newMessage = {
-      id: Date.now(),
       sender: loggedInAdmin ? loggedInAdmin.username : 'Admin',
       subject: messageSubject,
       body: messageBody,
@@ -68,33 +67,51 @@ function AdminMessaging() {
       recipientId: selectedRecipientId || null,
       isRead: false,
     };
-    setAdminMessages(prevMessages => [...prevMessages, newMessage]);
-    let notificationTitle = `New Admin Message: ${messageSubject}`;
-    let notificationBody = messageBody;
-    if (recipientType.includes('individual')) {
-      const recipientName = recipientType === 'individualStudent'
-        ? (students.find(s => s.admissionNo === selectedRecipientId)?.firstName + ' ' + students.find(s => s.admissionNo === selectedRecipientId)?.lastName || selectedRecipientId)
-        : (staffs.find(s => s.staffId === selectedRecipientId)?.firstname + ' ' + staffs.find(s => s.staffId === selectedRecipientId)?.surname || selectedRecipientId);
-      addNotification({
-        title: notificationTitle,
-        body: notificationBody,
-        recipientType: recipientType,
-        recipientId: selectedRecipientId
+    
+    try {
+      const response = await fetch('http://localhost:5000/api/schoolPortalAdminMessages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newMessage),
       });
-      setMessage({ type: 'success', text: `Message and notification sent to ${recipientName} (simulated email/WhatsApp).` });
-      console.log(`Simulating email/WhatsApp to ${recipientName}: Subject: "${messageSubject}", Body: "${messageBody}"`);
-    } else if (recipientType.includes('all')) {
-      addNotification({
-        title: notificationTitle,
-        body: notificationBody,
-        recipientType: recipientType,
-        recipientId: null
-      });
-      setMessage({ type: 'success', text: `Message and notification sent to all ${recipientType.replace('all', '')} (simulated).` });
-      console.log(`Simulating message to all ${recipientType.replace('all', '')}: Subject: "${messageSubject}", Body: "${messageBody}"`);
-    } else {
-      setMessage({ type: 'success', text: 'Message sent successfully (simulated).' });
+
+      if (response.ok) {
+        const createdMessage = await response.json();
+        setAdminMessages(prevMessages => [...prevMessages, createdMessage]);
+        
+        let notificationTitle = `New Admin Message: ${messageSubject}`;
+        let notificationBody = messageBody;
+        
+        if (recipientType.includes('individual')) {
+          const recipientName = recipientType === 'individualStudent'
+            ? (students.find(s => s.admissionNo === selectedRecipientId)?.firstName + ' ' + students.find(s => s.admissionNo === selectedRecipientId)?.lastName || selectedRecipientId)
+            : (staffs.find(s => s.staffId === selectedRecipientId)?.firstname + ' ' + staffs.find(s => s.staffId === selectedRecipientId)?.surname || selectedRecipientId);
+          addNotification({
+            title: notificationTitle,
+            body: notificationBody,
+            recipientType: recipientType,
+            recipientId: selectedRecipientId
+          });
+          setMessage({ type: 'success', text: `Message and notification sent to ${recipientName} (simulated email/WhatsApp).` });
+        } else if (recipientType.includes('all')) {
+          addNotification({
+            title: notificationTitle,
+            body: notificationBody,
+            recipientType: recipientType,
+            recipientId: null
+          });
+          setMessage({ type: 'success', text: `Message and notification sent to all ${recipientType.replace('all', '')} (simulated).` });
+        } else {
+          setMessage({ type: 'success', text: 'Message sent successfully (simulated).' });
+        }
+      } else {
+        const errorData = await response.json();
+        setMessage({ type: 'error', text: errorData.message || 'Failed to send message.' });
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
     }
+
     setSelectedRecipientId('');
     setMessageSubject('');
     setMessageBody('');

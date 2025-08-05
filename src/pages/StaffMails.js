@@ -10,7 +10,7 @@ function StaffMails() {
   const [loggedInStaff, setLoggedInStaff] = useState(null);
   const navigate = useNavigate();
   // Load all admin messages
-  const [adminMessages] = useLocalStorage('schoolPortalAdminMessages', []);
+  const [adminMessages, , loadingMessages] = useLocalStorage('schoolPortalAdminMessages', [], 'http://localhost:5000/api/schoolPortalAdminMessages');
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('loggedInUser'));
@@ -26,7 +26,7 @@ function StaffMails() {
     navigate('/home');
   };
 
-  if (!loggedInStaff) {
+  if (!loggedInStaff || loadingMessages) {
     return <div className="content-section">Loading staff mails...</div>;
   }
 
@@ -43,7 +43,7 @@ function StaffMails() {
 
       {staffRelevantMessages.length > 0 ? (
         staffRelevantMessages.map(mail => (
-          <div key={mail.id} style={{ border: '1px solid #ccc', padding: '15px', marginBottom: '15px', borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
+          <div key={mail._id} style={{ border: '1px solid #ccc', padding: '15px', marginBottom: '15px', borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
               <img src={mailsIcon} alt="Mail Icon" width="40px" height="40px" style={{ marginRight: '10px' }} />
               <div>
