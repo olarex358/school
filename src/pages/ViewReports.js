@@ -8,9 +8,9 @@ function ViewReports() {
   const navigate = useNavigate();
   
   // Update hooks to get data from the backend
-  const [students, , loadingStudents] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
-  const [results, , loadingResults] = useLocalStorage('schoolPortalResults', [], 'http://localhost:5000/api/schoolPortalResults');
-  const [subjects, , loadingSubjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
+  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
+  const [results] = useLocalStorage('schoolPortalResults', [], 'http://localhost:5000/api/schoolPortalResults');
+  const [subjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
   
   const [reportClassSelect, setReportClassSelect] = useState('');
   const [reportStudentSelect, setReportStudentSelect] = useState('');
@@ -220,7 +220,7 @@ function ViewReports() {
     s => reportClassSelect === '' || s.studentClass === reportClassSelect
   );
   
-  const loading = loadingStudents || loadingSubjects || loadingResults;
+  const loading = students.length === 0 || subjects.length === 0 || results.length === 0;
 
   const handleLogout = () => {
     localStorage.removeItem('loggedInUser');
@@ -261,7 +261,7 @@ function ViewReports() {
         >
           <option value="">Select Student</option>
           {studentsInSelectedClass.map(student => (
-            <option key={student.admissionNo} value={student.admissionNo}>
+            <option key={student._id} value={student.admissionNo}>
               {student.firstName} {student.lastName} ({student.admissionNo})
             </option>
           ))}
