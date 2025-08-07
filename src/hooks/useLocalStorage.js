@@ -5,7 +5,6 @@ function useLocalStorage(key, initialValue, backendUrl) {
   const [storedValue, setStoredValue] = useState(() => {
     try {
       const item = window.localStorage.getItem(key);
-      // ADDED: Check for literal 'undefined' string
       return item && item !== 'undefined' ? JSON.parse(item) : initialValue;
     } catch (error) {
       console.error(`Error reading localStorage key "${key}":`, error);

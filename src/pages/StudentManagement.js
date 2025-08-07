@@ -1,12 +1,17 @@
 // src/pages/StudentManagement.js
-import React, { useState } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
+import { useNavigate } from 'react-router-dom';
 import useLocalStorage from '../hooks/useLocalStorage';
+import ConfirmModal from '../components/ConfirmModal';
 
 function StudentManagement() {
-  // Update the hook to fetch data from the backend
+  const navigate = useNavigate();
+  const [loggedInAdmin, setLoggedInAdmin] = useState(null);
+
+  // Data from the backend via a custom hook
   const [students, setStudents, loadingStudents] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
   
-  const [newStudent, setNewStudent] = useState({
+  const initialStudentState = {
     firstName: '',
     lastName: '',
     dob: '',
@@ -18,16 +23,21 @@ function StudentManagement() {
     address: '',
     enrollmentDate: '',
     medicalNotes: '',
-    admissionDocument: ''
-  });
+    admissionDocument: '',
+    password: ''
+  };
+
+  const [newStudent, setNewStudent] = useState(initialStudentState);
   const [submitButtonText, setSubmitButtonText] = useState('Register Student');
   const [isEditing, setIsEditing] = useState(false);
-  const [editStudentId, setEditStudentId] = useState(null); // Keep track of the database ID for editing
+  const [editStudentId, setEditStudentId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [formErrors, setFormErrors] = useState({});
   const [message, setMessage] = useState(null);
   const [isNewStudentMode, setIsNewStudentMode] = useState(true);
   const [classFilter, setClassFilter] = useState('all');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState(null);
 
   const validateField = (name, value) => {
     let error = '';
@@ -43,8 +53,11 @@ function StudentManagement() {
         if (!value) error = 'Date is required.';
         break;
       case 'parentPhone':
-        if (!value.trim()) error = 'Parent phone is required.';
-        if (!/^\d{10,15}$/.test(value)) error = 'Invalid phone number (10-15 digits).';
+        if (!value.trim()) {
+          error = 'Parent phone is required.';
+        } else if (!/^\d{10,15}$/.test(value)) {
+          error = 'Invalid phone number (10-15 digits).';
+        }
         break;
       case 'studentClass':
       case 'gender':
@@ -52,6 +65,9 @@ function StudentManagement() {
         break;
       case 'admissionNo':
         if (!isNewStudentMode && !value.trim()) error = 'Admission number is required for old students.';
+        break;
+      case 'password':
+        if (!isEditing && !value) error = 'Password is required for new students.';
         break;
       default:
         break;
@@ -67,19 +83,13 @@ function StudentManagement() {
         ...prevStudent,
         [id]: file ? file.name : ''
       }));
-      setFormErrors(prevErrors => ({
-        ...prevErrors,
-        [id]: ''
-      }));
+      setFormErrors(prevErrors => ({ ...prevErrors, [id]: '' }));
     } else {
       setNewStudent(prevStudent => ({
         ...prevStudent,
         [id]: value
       }));
-      setFormErrors(prevErrors => ({
-        ...prevErrors,
-        [id]: validateField(id, value)
-      }));
+      setFormErrors(prevErrors => ({ ...prevErrors, [id]: validateField(id, value) }));
     }
     setMessage(null);
   };
@@ -110,19 +120,31 @@ function StudentManagement() {
     let errors = {};
     Object.keys(newStudent).forEach(key => {
       if (key === 'admissionNo' && isNewStudentMode) return;
+      if (key === 'password' && isEditing) return;
       const error = validateField(key, newStudent[key]);
       if (error) errors[key] = error;
     });
+
+    if (!isEditing && !newStudent.password) {
+      errors.password = 'Password is required for new students.';
+    }
+
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       setMessage({ type: 'error', text: 'Please correct the errors in the form.' });
       return;
     }
+    
     let finalAdmissionNo = newStudent.admissionNo;
     if (!isEditing) {
       finalAdmissionNo = generateAdmissionNumber();
     }
-    const studentToSave = { ...newStudent, admissionNo: finalAdmissionNo, username: finalAdmissionNo };
+    const studentToSave = { 
+      ...newStudent, 
+      admissionNo: finalAdmissionNo, 
+      username: finalAdmissionNo,
+      password: newStudent.password || (isEditing ? undefined : 'password123')
+    };
     
     try {
       if (isEditing) {
@@ -162,20 +184,7 @@ function StudentManagement() {
       setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
     }
     
-    setNewStudent({
-      firstName: '',
-      lastName: '',
-      dob: '',
-      admissionNo: '',
-      parentName: '',
-      parentPhone: '',
-      studentClass: '',
-      gender: '',
-      address: '',
-      enrollmentDate: '',
-      medicalNotes: '',
-      admissionDocument: ''
-    });
+    setNewStudent(initialStudentState);
     setSubmitButtonText('Register Student');
     setIsEditing(false);
     setIsNewStudentMode(true);
@@ -185,38 +194,47 @@ function StudentManagement() {
   const editStudent = (studentIdToEdit) => {
     const studentToEdit = students.find(s => s.admissionNo === studentIdToEdit);
     if (studentToEdit) {
-      setNewStudent(studentToEdit);
+      setNewStudent({ ...studentToEdit, password: '' });
       setSubmitButtonText('Update Student');
       setIsEditing(true);
       setIsNewStudentMode(false);
-      setEditStudentId(studentToEdit._id); // Store the database ID
+      setEditStudentId(studentToEdit._id);
       setFormErrors({});
       setMessage(null);
     }
   };
   
   const deleteStudent = async (studentIdToDelete) => {
-    if (window.confirm(`Are you sure you want to delete student with Admission No: ${studentIdToDelete}?`)) {
-      const studentToDelete = students.find(s => s.admissionNo === studentIdToDelete);
-      if (!studentToDelete) {
-        setMessage({ type: 'error', text: 'Student not found.' });
-        return;
-      }
-      try {
-        const response = await fetch(`http://localhost:5000/api/schoolPortalStudents/${studentToDelete._id}`, {
-          method: 'DELETE',
-        });
-        if (response.ok) {
-          setStudents(prevStudents => prevStudents.filter(student => student.admissionNo !== studentIdToDelete));
-          setMessage({ type: 'success', text: 'Student deleted successfully!' });
-        } else {
-          const errorData = await response.json();
-          setMessage({ type: 'error', text: errorData.message || 'Failed to delete student.' });
-        }
-      } catch (err) {
-        setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
-      }
+    setStudentToDelete(studentIdToDelete);
+    setIsModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    setIsModalOpen(false);
+    const studentToDeleteData = students.find(s => s.admissionNo === studentToDelete);
+    if (!studentToDeleteData) {
+      setMessage({ type: 'error', text: 'Student not found.' });
+      return;
     }
+    try {
+      const response = await fetch(`http://localhost:5000/api/schoolPortalStudents/${studentToDeleteData._id}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        setStudents(prevStudents => prevStudents.filter(student => student.admissionNo !== studentToDelete));
+        setMessage({ type: 'success', text: 'Student deleted successfully!' });
+      } else {
+        const errorData = await response.json();
+        setMessage({ type: 'error', text: errorData.message || 'Failed to delete student.' });
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
+    }
+  };
+
+  const cancelDelete = () => {
+    setIsModalOpen(false);
+    setStudentToDelete(null);
   };
   
   const handleSearchChange = (e) => {
@@ -230,20 +248,7 @@ function StudentManagement() {
   const clearSearchAndForm = () => {
     setSearchTerm('');
     setClassFilter('all');
-    setNewStudent({
-      firstName: '',
-      lastName: '',
-      dob: '',
-      admissionNo: '',
-      parentName: '',
-      parentPhone: '',
-      studentClass: '',
-      gender: '',
-      address: '',
-      enrollmentDate: '',
-      medicalNotes: '',
-      admissionDocument: ''
-    });
+    setNewStudent(initialStudentState);
     setSubmitButtonText('Register Student');
     setIsEditing(false);
     setIsNewStudentMode(true);
@@ -292,28 +297,31 @@ function StudentManagement() {
           </div>
         )}
         <form id="studentForm" onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '15px', display: 'flex', gap: '10px', flex: '1 1 100%', alignItems: 'center' }}>
+          <div className="form-group full-width" style={{ marginBottom: '15px' }}>
             <label>Student Type:</label>
-            <input
-              type="radio"
-              id="newStudentRadio"
-              name="studentType"
-              value="new"
-              checked={isNewStudentMode}
-              onChange={handleStudentModeChange}
-            />
-            <label htmlFor="newStudentRadio">New Student (Auto ID)</label>
-            <input
-              type="radio"
-              id="oldStudentRadio"
-              name="studentType"
-              value="old"
-              checked={!isNewStudentMode}
-              onChange={handleStudentModeChange}
-            />
-            <label htmlFor="oldStudentRadio">Old Student (Manual ID)</label>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <input
+                type="radio"
+                id="newStudentRadio"
+                name="studentType"
+                value="new"
+                checked={isNewStudentMode}
+                onChange={handleStudentModeChange}
+              />
+              <label htmlFor="newStudentRadio">New Student (Auto ID)</label>
+              <input
+                type="radio"
+                id="oldStudentRadio"
+                name="studentType"
+                value="old"
+                checked={!isNewStudentMode}
+                onChange={handleStudentModeChange}
+              />
+              <label htmlFor="oldStudentRadio">Old Student (Manual ID)</label>
+            </div>
           </div>
-          <div style={{ marginBottom: '10px' }}>
+          <div className="form-group">
+            <label htmlFor="firstName">First Name:</label>
             <input
               type="text"
               id="firstName"
@@ -321,11 +329,12 @@ function StudentManagement() {
               required
               value={newStudent.firstName}
               onChange={handleChange}
-              style={{ borderColor: formErrors.firstName ? 'red' : '' }}
+              className={formErrors.firstName ? 'input-error' : ''}
             />
-            {formErrors.firstName && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.firstName}</p>}
+            {formErrors.firstName && <p className="error-text">{formErrors.firstName}</p>}
           </div>
-          <div style={{ marginBottom: '10px' }}>
+          <div className="form-group">
+            <label htmlFor="lastName">Last Name:</label>
             <input
               type="text"
               id="lastName"
@@ -333,11 +342,12 @@ function StudentManagement() {
               required
               value={newStudent.lastName}
               onChange={handleChange}
-              style={{ borderColor: formErrors.lastName ? 'red' : '' }}
+              className={formErrors.lastName ? 'input-error' : ''}
             />
-            {formErrors.lastName && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.lastName}</p>}
+            {formErrors.lastName && <p className="error-text">{formErrors.lastName}</p>}
           </div>
-          <div style={{ marginBottom: '10px' }}>
+          <div className="form-group">
+            <label htmlFor="dob">Date of Birth:</label>
             <input
               type="date"
               id="dob"
@@ -345,11 +355,12 @@ function StudentManagement() {
               title="Date of Birth"
               value={newStudent.dob}
               onChange={handleChange}
-              style={{ borderColor: formErrors.dob ? 'red' : '' }}
+              className={formErrors.dob ? 'input-error' : ''}
             />
-            {formErrors.dob && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.dob}</p>}
+            {formErrors.dob && <p className="error-text">{formErrors.dob}</p>}
           </div>
-          <div style={{ marginBottom: '10px' }}>
+          <div className="form-group">
+            <label htmlFor="admissionNo">Admission No.:</label>
             <input
               type="text"
               id="admissionNo"
@@ -359,11 +370,12 @@ function StudentManagement() {
               disabled={isNewStudentMode && !isEditing}
               onChange={handleChange}
               required={!isNewStudentMode}
-              style={{ borderColor: formErrors.admissionNo ? 'red' : '' }}
+              className={formErrors.admissionNo ? 'input-error' : ''}
             />
-            {formErrors.admissionNo && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.admissionNo}</p>}
+            {formErrors.admissionNo && <p className="error-text">{formErrors.admissionNo}</p>}
           </div>
-          <div style={{ marginBottom: '10px' }}>
+          <div className="form-group">
+            <label htmlFor="parentName">Parent/Guardian Name:</label>
             <input
               type="text"
               id="parentName"
@@ -371,11 +383,12 @@ function StudentManagement() {
               required
               value={newStudent.parentName}
               onChange={handleChange}
-              style={{ borderColor: formErrors.parentName ? 'red' : '' }}
+              className={formErrors.parentName ? 'input-error' : ''}
             />
-            {formErrors.parentName && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.parentName}</p>}
+            {formErrors.parentName && <p className="error-text">{formErrors.parentName}</p>}
           </div>
-          <div style={{ marginBottom: '10px' }}>
+          <div className="form-group">
+            <label htmlFor="parentPhone">Parent/Guardian Phone:</label>
             <input
               type="tel"
               id="parentPhone"
@@ -383,17 +396,18 @@ function StudentManagement() {
               required
               value={newStudent.parentPhone}
               onChange={handleChange}
-              style={{ borderColor: formErrors.parentPhone ? 'red' : '' }}
+              className={formErrors.parentPhone ? 'input-error' : ''}
             />
-            {formErrors.parentPhone && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.parentPhone}</p>}
+            {formErrors.parentPhone && <p className="error-text">{formErrors.parentPhone}</p>}
           </div>
-          <div style={{ marginBottom: '10px' }}>
+          <div className="form-group">
+            <label htmlFor="studentClass">Class:</label>
             <select
               id="studentClass"
               required
               value={newStudent.studentClass}
               onChange={handleChange}
-              style={{ borderColor: formErrors.studentClass ? 'red' : '' }}
+              className={formErrors.studentClass ? 'input-error' : ''}
             >
               <option value="">Select Class</option>
               <option value="JSS1">JSS1</option>
@@ -403,24 +417,26 @@ function StudentManagement() {
               <option value="SS2">SS2</option>
               <option value="SS3">SS3</option>
             </select>
-            {formErrors.studentClass && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.studentClass}</p>}
+            {formErrors.studentClass && <p className="error-text">{formErrors.studentClass}</p>}
           </div>
-          <div style={{ marginBottom: '10px' }}>
+          <div className="form-group">
+            <label htmlFor="gender">Gender:</label>
             <select
               id="gender"
               required
               value={newStudent.gender}
               onChange={handleChange}
-              style={{ borderColor: formErrors.gender ? 'red' : '' }}
+              className={formErrors.gender ? 'input-error' : ''}
             >
               <option value="">Select Gender</option>
               <option value="Male">Male</option>
               <option value="Female">Female</option>
               <option value="Other">Other</option>
             </select>
-            {formErrors.gender && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.gender}</p>}
+            {formErrors.gender && <p className="error-text">{formErrors.gender}</p>}
           </div>
-          <div style={{ marginBottom: '10px' }}>
+          <div className="form-group">
+            <label htmlFor="address">Address:</label>
             <input
               type="text"
               id="address"
@@ -428,70 +444,88 @@ function StudentManagement() {
               required
               value={newStudent.address}
               onChange={handleChange}
-              style={{ borderColor: formErrors.address ? 'red' : '' }}
+              className={formErrors.address ? 'input-error' : ''}
             />
-            {formErrors.address && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.address}</p>}
+            {formErrors.address && <p className="error-text">{formErrors.address}</p>}
           </div>
-          <div style={{ marginBottom: '10px' }}>
-            <label htmlFor="enrollmentDate" style={{ display: 'block', marginBottom: '5px', fontSize: '0.9em', color: '#555' }}>Enrollment Date:</label>
+          <div className="form-group">
+            <label htmlFor="enrollmentDate">Enrollment Date:</label>
             <input
               type="date"
               id="enrollmentDate"
               required
               value={newStudent.enrollmentDate}
               onChange={handleChange}
-              style={{ borderColor: formErrors.enrollmentDate ? 'red' : '' }}
+              className={formErrors.enrollmentDate ? 'input-error' : ''}
             />
-            {formErrors.enrollmentDate && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.enrollmentDate}</p>}
+            {formErrors.enrollmentDate && <p className="error-text">{formErrors.enrollmentDate}</p>}
           </div>
-          <div style={{ marginBottom: '10px', flex: '1 1 100%' }}>
+          <div className="form-group">
+            <label htmlFor="password">Password: {isEditing && <span style={{ color: '#888', fontStyle: 'italic' }}>(Leave blank to keep current)</span>}</label>
+            <input
+              type="password"
+              id="password"
+              placeholder={isEditing ? "Leave blank" : "Password"}
+              required={!isEditing}
+              value={newStudent.password}
+              onChange={handleChange}
+              className={formErrors.password ? 'input-error' : ''}
+            />
+            {formErrors.password && <p className="error-text">{formErrors.password}</p>}
+          </div>
+          <div className="form-group full-width">
+            <label htmlFor="medicalNotes">Medical Notes (Optional):</label>
             <textarea
               id="medicalNotes"
               placeholder="Medical Notes (Optional)"
               rows="3"
               value={newStudent.medicalNotes}
               onChange={handleChange}
-              style={{ width: '100%', padding: '8px', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px', borderColor: formErrors.medicalNotes ? 'red' : '' }}
+              className={formErrors.medicalNotes ? 'input-error' : ''}
             ></textarea>
-            {formErrors.medicalNotes && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.medicalNotes}</p>}
+            {formErrors.medicalNotes && <p className="error-text">{formErrors.medicalNotes}</p>}
           </div>
-          <div style={{ marginBottom: '10px', flex: '1 1 100%' }}>
-            <label htmlFor="admissionDocument" style={{ display: 'block', marginBottom: '5px', fontSize: '0.9em', color: '#555' }}>Admission Document (PDF/Image):</label>
+          <div className="form-group full-width">
+            <label htmlFor="admissionDocument">Admission Document (PDF/Image):</label>
             <input
               type="file"
               id="admissionDocument"
               onChange={handleChange}
               accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-              style={{ width: '100%', padding: '8px', boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: '4px', borderColor: formErrors.admissionDocument ? 'red' : '' }}
+              className={formErrors.admissionDocument ? 'input-error' : ''}
             />
             {newStudent.admissionDocument && <p style={{ fontSize: '0.8em', color: '#555' }}>Selected: {newStudent.admissionDocument}</p>}
-            {formErrors.admissionDocument && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.admissionDocument}</p>}
+            {formErrors.admissionDocument && <p className="error-text">{formErrors.admissionDocument}</p>}
           </div>
-          <button type="submit">{submitButtonText}</button>
+          <div className="form-actions">
+            <button type="submit">{submitButtonText}</button>
+            <button type="button" onClick={clearSearchAndForm} className="secondary-button">Clear Form</button>
+          </div>
         </form>
       </div>
       <div className="sub-section">
         <h3>Student List</h3>
-        <input
-          type="text"
-          id="studentSearchFilter"
-          placeholder="Search by Name or Admission No."
-          value={searchTerm}
-          onChange={handleSearchChange}
-        />
-        <select
-          id="classFilter"
-          value={classFilter}
-          onChange={handleClassFilterChange}
-          style={{ padding: '0.6rem', fontSize: '1rem', border: '1px solid #ccc', borderRadius: '4px', flex: '1 1 48%' }}
-        >
-          {uniqueClasses.map(cls => (
-            <option key={cls} value={cls}>
-              {cls === 'all' ? 'All Classes' : cls}
-            </option>
-          ))}
-        </select>
-        <button onClick={clearSearchAndForm}>Clear Filter / Reset Form</button>
+        <div className="filter-controls">
+          <input
+            type="text"
+            id="studentSearchFilter"
+            placeholder="Search by Name or Admission No."
+            value={searchTerm}
+            onChange={handleSearchChange}
+          />
+          <select
+            id="classFilter"
+            value={classFilter}
+            onChange={handleClassFilterChange}
+          >
+            {uniqueClasses.map(cls => (
+              <option key={cls} value={cls}>
+                {cls === 'all' ? 'All Classes' : cls}
+              </option>
+            ))}
+          </select>
+          <button onClick={clearSearchAndForm} className="secondary-button">Clear Filter</button>
+        </div>
         <div className="table-container">
           <table id="studentTable">
             <thead>
@@ -523,7 +557,7 @@ function StudentManagement() {
                     <td>{student.parentPhone}</td>
                     <td>{student.medicalNotes || 'N/A'}</td>
                     <td>{student.admissionDocument ? <a href="#" onClick={(e) => { e.preventDefault(); alert(`Simulating download of: ${student.admissionDocument}`); }}>{student.admissionDocument}</a> : 'N/A'}</td>
-                    <td>
+                    <td className="action-buttons">
                     <button
                         className="action-btn edit-btn"
                         onClick={() => editStudent(student.admissionNo)}>
@@ -546,6 +580,12 @@ function StudentManagement() {
           </table>
         </div>
       </div>
+      <ConfirmModal
+        isOpen={isModalOpen}
+        message={`Are you sure you want to delete student with Admission No: ${studentToDelete}?`}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
     </div>
   );
 }

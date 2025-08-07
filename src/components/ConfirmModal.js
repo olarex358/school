@@ -11,11 +11,11 @@ function ConfirmModal({ isOpen, message, onConfirm, onCancel }) {
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.6)', /* Dark overlay */
+      backgroundColor: 'rgba(0, 0, 0, 0.6)',
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      zIndex: 1000 /* Ensure it's on top */
+      zIndex: 1000
     }}>
       <div style={{
         backgroundColor: 'white',
@@ -48,7 +48,7 @@ function ConfirmModal({ isOpen, message, onConfirm, onCancel }) {
             onClick={onCancel}
             style={{
               padding: '10px 25px',
-              backgroundColor: '#6c757d', /* Gray for cancel */
+              backgroundColor: '#6c757d',
               color: 'white',
               border: 'none',
               borderRadius: '5px',
