@@ -40,6 +40,7 @@ function AdminDigitalLibrary() {
 
   const showAlert = (msg) => {
     setModalMessage(msg);
+    setModalAction(() => {});
     setIsModalAlert(true);
     setIsModalOpen(true);
   };
@@ -91,7 +92,7 @@ function AdminDigitalLibrary() {
 
     if (selectedFile) {
         try {
-            filePath = await uploadFile(selectedFile, 'digital-library');
+            filePath = await uploadFile(selectedFile);
         } catch (err) {
             showAlert(err.message);
             return;
@@ -204,7 +205,7 @@ function AdminDigitalLibrary() {
     setFormErrors({});
   };
 
-  const filteredResources = digitalLibrary.filter(res =>
+  const filteredResources = (digitalLibrary || []).filter(res =>
     res.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     res.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
     res.filename.toLowerCase().includes(searchTerm.toLowerCase())

@@ -67,16 +67,36 @@ function Dashboard() {
     navigate('/home');
   };
 
-  if (!adminInfo || loading) {
-      return <div className="content-section">Loading Admin Dashboard...</div>;
+  if (!adminInfo) {
+      return <div className="content-section">Loading admin info...</div>;
+  }
+  
+  if (loading) {
+      return <div className="content-section">Loading data...</div>;
   }
 
   if (error) {
     return <div className="content-section">Error loading data: {error.message}</div>;
   }
 
-  // Filter links based on permissions
   const filteredNavLinks = adminNavLinks.filter(link => hasPermission('admin', link.to));
+
+  const getCount = (path) => {
+    switch (path) {
+      case '/student-management': return students?.length || 0;
+      case '/staff-management': return staffs?.length || 0;
+      case '/results-management': return results?.length || 0;
+      case '/admin-results-approval': return pendingResults?.length || 0;
+      case '/academic-management': return subjects?.length || 0;
+      case '/user-permissions-management': return users?.length || 0;
+      case '/admin-fees-management': return feeRecords?.length || 0;
+      case '/admin-calendar-management': return calendarEvents?.length || 0;
+      case '/admin-syllabus-management': return syllabusEntries?.length || 0;
+      case '/admin-digital-library': return digitalLibrary?.length || 0;
+      case '/admin-certification-management': return certificationResults?.length || 0;
+      default: return null;
+    }
+  };
 
   return (
     <div className="container">
@@ -99,17 +119,7 @@ function Dashboard() {
                 <div className="card" key={link.to} onClick={() => handleCardClick(link.to)}>
                     <img src={link.icon} alt={link.text} width="50px" height="50px" />
                     {link.text}
-                    {link.to === '/student-management' && ` (${students.length})`}
-                    {link.to === '/staff-management' && ` (${staffs.length})`}
-                    {link.to === '/results-management' && ` (${results.length})`}
-                    {link.to === '/admin-results-approval' && ` (${pendingResults.length})`}
-                    {link.to === '/academic-management' && ` (${subjects.length})`}
-                    {link.to === '/user-permissions-management' && ` (${users.length})`}
-                    {link.to === '/admin-fees-management' && ` (${feeRecords.length})`}
-                    {link.to === '/admin-calendar-management' && ` (${calendarEvents.length})`}
-                    {link.to === '/admin-syllabus-management' && ` (${syllabusEntries.length})`}
-                    {link.to === '/admin-digital-library' && ` (${digitalLibrary.length})`}
-                    {link.to === '/admin-certification-management' && ` (${certificationResults.length})`}
+                    {getCount(link.to) !== null && ` (${getCount(link.to)})`}
                 </div>
               ))}
           </div>

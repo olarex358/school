@@ -1,12 +1,17 @@
 // src/pages/StudentManagement.js
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import { uploadFile } from '../utils/uploadFile';
 import ConfirmModal from '../components/ConfirmModal';
 
 
 function StudentManagement() {
-  const { students, setStudents, loading, error } = useData();
+  const navigate = useNavigate();
+  const [loggedInAdmin, setLoggedInAdmin] = useState(null);
+
+  const { students: studentsData, setStudents, loading, error } = useData();
+  const students = Array.isArray(studentsData) ? studentsData : [];
   
   const [newStudent, setNewStudent] = useState({
     firstName: '',
@@ -34,7 +39,7 @@ function StudentManagement() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
-  const [modalAction, setModalAction] = useState(() => {});
+  const [modalAction, setModalAction] = useState(null);
   const [isModalAlert, setIsModalAlert] = useState(false);
 
   const showConfirm = (msg, action) => {
@@ -44,12 +49,21 @@ function StudentManagement() {
     setIsModalOpen(true);
   };
 
-  const showAlert = (msg, action = () => {}) => {
+  const showAlert = (msg) => {
     setModalMessage(msg);
-    setModalAction(() => action);
+    setModalAction(() => {});
     setIsModalAlert(true);
     setIsModalOpen(true);
   };
+  
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('loggedInUser'));
+    if (user && user.type === 'admin') {
+      setLoggedInAdmin(user);
+    } else {
+      navigate('/login');
+    }
+  }, [navigate]);
   
   const validateField = (name, value) => {
     let error = '';
@@ -119,7 +133,10 @@ function StudentManagement() {
   const generateAdmissionNumber = () => {
     const currentYear = new Date().getFullYear();
     const maxCounter = students.length > 0
-      ? Math.max(...students.map(s => parseInt(s.admissionNo.split('/').pop())))
+      ? Math.max(...students.map(s => {
+          const parts = s.admissionNo.split('/');
+          return parts.length > 0 ? parseInt(parts.pop()) : 0;
+        }))
       : 0;
     const nextCounter = maxCounter + 1;
     return `BAC/STD/${currentYear}/${String(nextCounter).padStart(4, '0')}`;
@@ -151,10 +168,20 @@ function StudentManagement() {
     }
     
     let finalAdmissionNo = newStudent.admissionNo;
-    if (!isEditing) {
+    if (!isEditing && isNewStudentMode) {
       finalAdmissionNo = generateAdmissionNumber();
+    } else if (!isNewStudentMode && !finalAdmissionNo) {
+        showAlert('Admission number is required for an old student.');
+        return;
     }
-    const studentToSave = { ...newStudent, admissionNo: finalAdmissionNo, username: finalAdmissionNo, admissionDocument: admissionDocPath };
+
+    const studentToSave = { 
+        ...newStudent, 
+        admissionNo: finalAdmissionNo, 
+        username: finalAdmissionNo, 
+        admissionDocument: admissionDocPath,
+        password: '123'
+    };
     
     try {
       const token = localStorage.getItem('token');
@@ -179,10 +206,12 @@ function StudentManagement() {
           showAlert(errorData.message || 'Failed to update student.');
         }
       } else {
+        // Corrected logic: remove the _id from the object before sending
+        const { _id, ...studentWithoutId } = studentToSave;
         const response = await fetch('http://localhost:5000/api/schoolPortalStudents', {
           method: 'POST',
           headers,
-          body: JSON.stringify(studentToSave),
+          body: JSON.stringify(studentWithoutId),
         });
         if (response.ok) {
           const newStudentEntry = await response.json();
@@ -317,6 +346,10 @@ function StudentManagement() {
     return classOrder.indexOf(a) - classOrder.indexOf(b);
   });
   
+  if (!loggedInAdmin) {
+    return <div className="content-section">Access Denied. Please log in as an Admin.</div>;
+  }
+
   if (loading) {
       return <div className="content-section">Loading student data...</div>;
   }
@@ -330,7 +363,12 @@ function StudentManagement() {
       <ConfirmModal 
         isOpen={isModalOpen}
         message={modalMessage}
-        onConfirm={() => { modalAction(); setIsModalOpen(false); }}
+        onConfirm={() => {
+            if (modalAction) {
+                modalAction();
+            }
+            setIsModalOpen(false);
+        }}
         onCancel={() => setIsModalOpen(false)}
         isAlert={isModalAlert}
       />
@@ -386,6 +424,7 @@ function StudentManagement() {
             <input
               type="date"
               id="dob"
+              placeholder="Date of Birth"
               title="Date of Birth"
               value={newStudent.dob}
               onChange={handleChange}
@@ -398,8 +437,8 @@ function StudentManagement() {
               type="text"
               id="admissionNo"
               placeholder={isNewStudentMode ? "Admission No. (Auto-generated)" : "Admission No. (Manual)"}
-              value={isNewStudentMode ? generateAdmissionNumber() : newStudent.admissionNo}
-              readOnly={isNewStudentMode}
+              value={isNewStudentMode && !isEditing ? generateAdmissionNumber() : newStudent.admissionNo}
+              readOnly={isNewStudentMode && !isEditing}
               disabled={isNewStudentMode && !isEditing}
               onChange={handleChange}
               className={`form-input ${formErrors.admissionNo ? 'form-input-error' : ''} ${isNewStudentMode ? 'form-input-disabled' : ''}`}
@@ -490,7 +529,7 @@ function StudentManagement() {
               accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
               className={`form-input-file ${formErrors.admissionDocument ? 'form-input-error' : ''}`}
             />
-            {newStudent.admissionDocument && <p className="file-info">Selected: {newStudent.admissionDocument}</p>}
+            {newStudent.admissionDocument && <p className="file-info">Selected: {selectedFile?.name || (newStudent.admissionDocument.split('/').pop().length > 14 ? newStudent.admissionDocument.split('/').pop().substring(14) : newStudent.admissionDocument.split('/').pop())}</p>}
             {formErrors.admissionDocument && <p className="error-message">{formErrors.admissionDocument}</p>}
           </div>
           <div className="form-group form-group-full">
@@ -505,7 +544,7 @@ function StudentManagement() {
           </div>
           <div className="form-actions">
             <button type="submit" className="form-submit-btn">
-              {submitButtonText}
+              {isEditing ? 'Update Student' : 'Add Student'}
             </button>
             <button type="button" onClick={clearSearchAndForm} className="form-clear-btn">
               Clear Form
@@ -536,7 +575,7 @@ function StudentManagement() {
               </option>
             ))}
           </select>
-          <button onClick={clearSearchAndForm} className="filter-clear-btn">
+          <button type="button" onClick={clearSearchAndForm} className="filter-clear-btn">
             Clear Filter / Reset Form
           </button>
         </div>
@@ -570,7 +609,7 @@ function StudentManagement() {
                     <td>{student.parentName}</td>
                     <td>{student.parentPhone}</td>
                     <td>{student.medicalNotes || 'N/A'}</td>
-                    <td>{student.admissionDocument ? <a href={`http://localhost:5000${student.admissionDocument}`} target="_blank" rel="noopener noreferrer">{student.admissionDocument.split('/').pop()}</a> : 'N/A'}</td>
+                    <td>{student.admissionDocument ? <a href={student.admissionDocument} target="_blank" rel="noopener noreferrer">{student.admissionDocument.split('/').pop().length > 14 ? student.admissionDocument.split('/').pop().substring(14) : student.admissionDocument.split('/').pop()}</a> : 'N/A'}</td>
                     <td className="table-actions">
                     <button
                         className="action-btn edit-btn"

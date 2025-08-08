@@ -1,33 +1,43 @@
 // src/utils/uploadFile.js
 
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "../firebase/firebase";
-
 /**
- * Uploads a file to Firebase Storage.
+ * Uploads a file to the backend API and returns the file path.
  * @param {File} file The file object to upload.
- * @param {string} destinationPath The path in Firebase Storage to save the file (e.g., 'digital-library/' or 'resumes/').
- * @returns {Promise<string>} The public download URL of the uploaded file.
+ * @returns {Promise<string>} The file path from the server.
  */
-export const uploadFile = async (file, destinationPath) => {
+export const uploadFile = async (file) => {
   if (!file) {
     throw new Error("No file selected.");
   }
 
-  // Create a unique file name to avoid collisions
-  const uniqueFileName = `${Date.now()}-${file.name}`;
-  const storageRef = ref(storage, `${destinationPath}/${uniqueFileName}`);
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error("User not authenticated.");
+  }
 
   try {
-    // Upload the file to Firebase Storage
-    const snapshot = await uploadBytes(storageRef, file);
-    
-    // Get the download URL
-    const downloadURL = await getDownloadURL(snapshot.ref);
-    
-    return downloadURL;
+    const response = await fetch('http://localhost:5000/api/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      // Check if the response is JSON, otherwise read as text
+      const isJson = response.headers.get('content-type')?.includes('application/json');
+      const errorData = isJson ? await response.json() : await response.text();
+      throw new Error(errorData.message || errorData || 'File upload failed.');
+    }
+
+    const data = await response.json();
+    return data.filePath;
   } catch (error) {
-    console.error("Firebase Storage upload error:", error);
-    throw new Error(`File upload failed: ${error.message}`);
+    console.error("File upload utility error:", error);
+    throw error;
   }
 };
