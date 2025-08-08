@@ -1,19 +1,17 @@
 // src/pages/StudentAttendance.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import useLocalStorage from '../hooks/useLocalStorage'; // Import useLocalStorage
+import useLocalStorage from '../hooks/useLocalStorage';
+import ConfirmModal from '../components/ConfirmModal';
 
-// Import the attendance icon
+
 import attendanceIcon from '../icon/attendance.png';
 
 function StudentAttendance() {
   const [loggedInStudent, setLoggedInStudent] = useState(null);
   const navigate = useNavigate();
 
-  // Load all attendance records
   const [allAttendanceRecords, , loadingAttendance] = useLocalStorage('schoolPortalAttendance', [], 'http://localhost:5000/api/schoolPortalAttendance');
-
-  // State to store filtered attendance for the student
   const [studentAttendance, setStudentAttendance] = useState([]);
   const [attendanceSummary, setAttendanceSummary] = useState({
     present: 0,
@@ -23,26 +21,34 @@ function StudentAttendance() {
     percentage: 0
   });
 
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+  const [isModalAlert, setIsModalAlert] = useState(false);
+
+  const showAlert = (msg) => {
+    setModalMessage(msg);
+    setIsModalAlert(true);
+    setIsModalOpen(true);
+  };
+
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('loggedInUser'));
-    // Ensure user is logged in and is a student
     if (user && user.type === 'student') {
       setLoggedInStudent(user);
     } else {
-      navigate('/home'); // Redirect if not logged in as a student
+      navigate('/home');
     }
   }, [navigate]);
 
   useEffect(() => {
     if (loggedInStudent && allAttendanceRecords.length > 0) {
-      // Filter records for the logged-in student
       const filteredRecords = allAttendanceRecords.filter(
         record => record.studentId === loggedInStudent.admissionNo
-      ).sort((a, b) => new Date(b.date) - new Date(a.date)); // Sort by date, newest first
+      ).sort((a, b) => new Date(b.date) - new Date(a.date));
 
       setStudentAttendance(filteredRecords);
 
-      // Calculate summary
       let presentCount = 0;
       let absentCount = 0;
       let lateCount = 0;
@@ -65,7 +71,7 @@ function StudentAttendance() {
         absent: absentCount,
         late: lateCount,
         totalRecords: total,
-        percentage: parseFloat(percentage) // Store as number
+        percentage: parseFloat(percentage)
       });
     } else {
         setStudentAttendance([]);
@@ -79,7 +85,6 @@ function StudentAttendance() {
     }
   }, [loggedInStudent, allAttendanceRecords]);
 
-
   const handleLogout = () => {
     localStorage.removeItem('loggedInUser');
     navigate('/login');
@@ -89,20 +94,41 @@ function StudentAttendance() {
     return <div className="content-section">Loading attendance records...</div>;
   }
 
+  const attendanceRateClass = attendanceSummary.percentage >= 80 ? 'rate-green' : attendanceSummary.percentage >= 60 ? 'rate-orange' : 'rate-red';
+
   return (
     <div className="content-section">
+      <ConfirmModal
+        isOpen={isModalOpen}
+        message={modalMessage}
+        onConfirm={() => setIsModalOpen(false)}
+        onCancel={() => setIsModalOpen(false)}
+        isAlert={isModalAlert}
+      />
       <h1>My Attendance Records</h1>
       <p>Welcome, {loggedInStudent.firstName} {loggedInStudent.lastName}! Here is your attendance overview:</p>
 
-      <div style={{ border: '1px solid #ccc', padding: '20px', borderRadius: '8px', marginTop: '20px', backgroundColor: '#f9f9f9', display: 'flex', alignItems: 'center', marginBottom: '30px' }}>
-        <img src={attendanceIcon} alt="Attendance Icon" width="80px" height="80px" style={{ marginRight: '20px' }} />
-        <div>
+      <div className="attendance-summary-card">
+        <div className="attendance-icon-container">
+          <img src={attendanceIcon} alt="Attendance Icon" className="attendance-icon" />
+        </div>
+        <div className="attendance-summary-content">
           <h3>Attendance Summary</h3>
-          <p><strong>Total Days Recorded:</strong> {attendanceSummary.totalRecords}</p>
-          <p><strong>Present:</strong> {attendanceSummary.present}</p>
-          <p><strong>Absent:</strong> {attendanceSummary.absent}</p>
-          <p><strong>Late:</strong> {attendanceSummary.late}</p>
-          <p style={{ marginTop: '10px', color: attendanceSummary.percentage >= 80 ? 'green' : attendanceSummary.percentage >= 60 ? 'orange' : 'red', fontWeight: 'bold' }}>
+          <div className="summary-stats-grid">
+            <div className="stat-item">
+              <strong>Total Days:</strong> <span>{attendanceSummary.totalRecords}</span>
+            </div>
+            <div className="stat-item">
+              <strong>Present:</strong> <span className="text-green-600">{attendanceSummary.present}</span>
+            </div>
+            <div className="stat-item">
+              <strong>Absent:</strong> <span className="text-red-600">{attendanceSummary.absent}</span>
+            </div>
+            <div className="stat-item">
+              <strong>Late:</strong> <span className="text-orange-600">{attendanceSummary.late}</span>
+            </div>
+          </div>
+          <p className={`attendance-rate ${attendanceRateClass}`}>
             Attendance Rate: {attendanceSummary.percentage}%
           </p>
         </div>
@@ -111,24 +137,24 @@ function StudentAttendance() {
       <h2>Detailed Records</h2>
       {studentAttendance.length > 0 ? (
         <div className="table-container">
-          <table>
+          <table className="attendance-table">
             <thead>
               <tr>
                 <th>Date</th>
                 <th>Class</th>
                 <th>Status</th>
-                <th>Marked By (Teacher ID)</th>
+                <th>Marked By</th>
               </tr>
             </thead>
             <tbody>
-              {studentAttendance.map(record => (
-                <tr key={record._id}>
+              {studentAttendance.map((record, index) => (
+                <tr key={record._id} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
                   <td>{record.date}</td>
                   <td>{record.class}</td>
-                  <td style={{ color: record.status === 'Present' ? 'green' : record.status === 'Absent' ? 'red' : 'orange' }}>
+                  <td className={`status-cell status-${record.status.toLowerCase()}`}>
                     {record.status}
                   </td>
-                  <td>{record.markedBy}</td> {/* Display teacher ID for now */}
+                  <td>{record.markedBy}</td>
                 </tr>
               ))}
             </tbody>
@@ -138,10 +164,10 @@ function StudentAttendance() {
         <p>No attendance records found for you yet.</p>
       )}
 
-      <p style={{ marginTop: '20px' }}>
+      <p className="mt-4">
         For any discrepancies or detailed attendance breakdown by subject, please contact your class teacher.
       </p>
-      <button onClick={handleLogout} style={{ marginTop: '20px' }}>Logout</button>
+      <button onClick={handleLogout} className="logout-button">Logout</button>
     </div>
   );
 }

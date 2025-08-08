@@ -4,27 +4,45 @@ import { useNavigate } from 'react-router-dom';
 import useLocalStorage from '../hooks/useLocalStorage';
 import ConfirmModal from '../components/ConfirmModal';
 
+
 function AcademicManagement() {
   const navigate = useNavigate();
   const [loggedInAdmin, setLoggedInAdmin] = useState(null);
 
-  // Data from the backend via a custom hook
+  // Update hook to get data from the backend
   const [subjects, setSubjects, loadingSubjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
 
-  const initialSubjectState = {
+  const [newSubject, setNewSubject] = useState({
     subjectName: '',
     subjectCode: ''
-  };
-
-  const [newSubject, setNewSubject] = useState(initialSubjectState);
+  });
   const [submitButtonText, setSubmitButtonText] = useState('Add Subject');
   const [isEditing, setIsEditing] = useState(false);
-  const [editSubjectId, setEditSubjectId] = useState(null);
+  const [editSubjectId, setEditSubjectId] = useState(null); // To store the MongoDB _id
   const [searchTerm, setSearchTerm] = useState('');
   const [formErrors, setFormErrors] = useState({});
   const [message, setMessage] = useState(null);
+
+  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [subjectToDelete, setSubjectToDelete] = useState(null);
+  const [modalMessage, setModalMessage] = useState('');
+  const [modalAction, setModalAction] = useState(() => {});
+  const [isModalAlert, setIsModalAlert] = useState(false);
+
+  // Helper functions for modal control
+  const showConfirm = (msg, action) => {
+    setModalMessage(msg);
+    setModalAction(() => action);
+    setIsModalAlert(false);
+    setIsModalOpen(true);
+  };
+
+  const showAlert = (msg, action = () => {}) => {
+    setModalMessage(msg);
+    setModalAction(() => action);
+    setIsModalAlert(true);
+    setIsModalOpen(true);
+  };
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('loggedInUser'));
@@ -49,15 +67,17 @@ function AcademicManagement() {
       ...prevSubject,
       [id]: value
     }));
-    setFormErrors(prevErrors => ({ ...prevErrors, [id]: '' }));
-    setMessage(null);
+    setFormErrors(prevErrors => ({
+      ...prevErrors,
+      [id]: ''
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage(null);
     if (!validateForm()) {
-      setMessage({ type: 'error', text: 'Please correct the errors in the form.' });
+      showAlert('Please correct the errors in the form.');
       return;
     }
 
@@ -73,10 +93,10 @@ function AcademicManagement() {
                 setSubjects(prevSubjects =>
                     prevSubjects.map(sub => (sub._id === updatedSubject._id ? updatedSubject : sub))
                 );
-                setMessage({ type: 'success', text: 'Subject data updated successfully!' });
+                showAlert('Subject data updated successfully!');
             } else {
                 const errorData = await response.json();
-                setMessage({ type: 'error', text: errorData.message || 'Failed to update subject.' });
+                showAlert(errorData.message || 'Failed to update subject.');
             }
         } else {
             const response = await fetch('http://localhost:5000/api/schoolPortalSubjects', {
@@ -87,25 +107,28 @@ function AcademicManagement() {
             if (response.ok) {
                 const createdSubject = await response.json();
                 setSubjects(prevSubjects => [...prevSubjects, createdSubject]);
-                setMessage({ type: 'success', text: 'New subject added successfully!' });
+                showAlert('New subject added successfully!');
             } else {
                 const errorData = await response.json();
-                setMessage({ type: 'error', text: errorData.message || 'Failed to add new subject.' });
+                showAlert(errorData.message || 'Failed to add new subject.');
             }
         }
     } catch (err) {
-        setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
+        showAlert('An unexpected error occurred. Please check your network connection.');
     }
 
-    setNewSubject(initialSubjectState);
+    setNewSubject({
+      subjectName: '',
+      subjectCode: ''
+    });
     setSubmitButtonText('Add Subject');
     setIsEditing(false);
     setEditSubjectId(null);
     setFormErrors({});
   };
 
-  const editSubject = (subjectIdToEdit) => {
-    const subjectToEdit = subjects.find(s => s.subjectCode === subjectIdToEdit);
+  const editSubject = (subjectCodeToEdit) => {
+    const subjectToEdit = subjects.find(s => s.subjectCode === subjectCodeToEdit);
     if (subjectToEdit) {
       setNewSubject(subjectToEdit);
       setSubmitButtonText('Update Subject');
@@ -117,36 +140,30 @@ function AcademicManagement() {
   };
 
   const deleteSubject = (subjectCodeToDelete) => {
-    setSubjectToDelete(subjectCodeToDelete);
-    setIsModalOpen(true);
-  };
-
-  const confirmDelete = async () => {
-    setIsModalOpen(false);
-    const subjectToDeleteData = subjects.find(s => s.subjectCode === subjectToDelete);
-    if (!subjectToDeleteData) {
-      setMessage({ type: 'error', text: 'Subject not found.' });
-      return;
-    }
-    try {
-        const response = await fetch(`http://localhost:5000/api/schoolPortalSubjects/${subjectToDeleteData._id}`, {
-            method: 'DELETE',
-        });
-        if (response.ok) {
-            setSubjects(prevSubjects => prevSubjects.filter(subject => subject.subjectCode !== subjectToDelete));
-            setMessage({ type: 'success', text: 'Subject deleted successfully!' });
-        } else {
-            const errorData = await response.json();
-            setMessage({ type: 'error', text: errorData.message || 'Failed to delete subject.' });
+    showConfirm(
+      `Are you sure you want to delete subject: ${subjectCodeToDelete}?`,
+      async () => {
+        const subjectToDelete = subjects.find(s => s.subjectCode === subjectCodeToDelete);
+        if (!subjectToDelete) {
+            showAlert('Subject not found.');
+            return;
         }
-    } catch (err) {
-        setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
-    }
-  };
-
-  const cancelDelete = () => {
-    setIsModalOpen(false);
-    setSubjectToDelete(null);
+        try {
+            const response = await fetch(`http://localhost:5000/api/schoolPortalSubjects/${subjectToDelete._id}`, {
+                method: 'DELETE',
+            });
+            if (response.ok) {
+                setSubjects(prevSubjects => prevSubjects.filter(subject => subject.subjectCode !== subjectCodeToDelete));
+                showAlert('Subject deleted successfully!');
+            } else {
+                const errorData = await response.json();
+                showAlert(errorData.message || 'Failed to delete subject.');
+            }
+        } catch (err) {
+            showAlert('An unexpected error occurred. Please check your network connection.');
+        }
+      }
+    );
   };
 
   const handleSearchChange = (e) => {
@@ -155,7 +172,10 @@ function AcademicManagement() {
 
   const clearSearchAndForm = () => {
     setSearchTerm('');
-    setNewSubject(initialSubjectState);
+    setNewSubject({
+      subjectName: '',
+      subjectCode: ''
+    });
     setSubmitButtonText('Add Subject');
     setIsEditing(false);
     setEditSubjectId(null);
@@ -168,61 +188,61 @@ function AcademicManagement() {
     subject.subjectCode.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (!loggedInAdmin) {
-    return <div className="content-section">Access Denied. Please log in as an Admin.</div>;
-  }
-
-  if (loadingSubjects) {
+  if (!loggedInAdmin || loadingSubjects) {
     return <div className="content-section">Loading subjects data...</div>;
   }
 
   return (
     <div className="content-section">
-      <h2>Academic Management (Subjects)</h2>
+      <ConfirmModal
+        isOpen={isModalOpen}
+        message={modalMessage}
+        onConfirm={() => { modalAction(); setIsModalOpen(false); }}
+        onCancel={() => setIsModalOpen(false)}
+        isAlert={isModalAlert}
+      />
+      <h1>Academic Management (Subjects)</h1>
       <div className="sub-section">
-        <h3>{isEditing ? 'Edit Subject' : 'Add New Subject'}</h3>
-        {message && (
-          <div style={{ padding: '10px', marginBottom: '15px', borderRadius: '5px', color: 'white', backgroundColor: message.type === 'success' ? '#28a745' : '#dc3545' }}>
-            {message.text}
-          </div>
-        )}
-        <form id="subjectForm" onSubmit={handleSubmit}>
+        <h2>{isEditing ? 'Edit Subject' : 'Add/Edit Subject'}</h2>
+        <form id="subjectForm" onSubmit={handleSubmit} className="academic-form">
           <div className="form-group">
-            <label htmlFor="subjectName">Subject Name:</label>
+            <label htmlFor="subjectName" className="form-label">Subject Name:</label>
             <input
               type="text"
               id="subjectName"
               placeholder="e.g., Mathematics"
-              required
               value={newSubject.subjectName}
               onChange={handleChange}
-              className={formErrors.subjectName ? 'input-error' : ''}
+              className={`form-input ${formErrors.subjectName ? 'form-input-error' : ''}`}
             />
-            {formErrors.subjectName && <p className="error-text">{formErrors.subjectName}</p>}
+            {formErrors.subjectName && <p className="error-message">{formErrors.subjectName}</p>}
           </div>
           <div className="form-group">
-            <label htmlFor="subjectCode">Subject Code:</label>
+            <label htmlFor="subjectCode" className="form-label">Subject Code:</label>
             <input
               type="text"
               id="subjectCode"
               placeholder="e.g., MATH101"
-              required
               value={newSubject.subjectCode}
               onChange={handleChange}
               readOnly={isEditing}
               disabled={isEditing}
-              className={formErrors.subjectCode ? 'input-error' : ''}
+              className={`form-input ${formErrors.subjectCode ? 'form-input-error' : ''} ${isEditing ? 'form-input-disabled' : ''}`}
             />
-            {formErrors.subjectCode && <p className="error-text">{formErrors.subjectCode}</p>}
+            {formErrors.subjectCode && <p className="error-message">{formErrors.subjectCode}</p>}
           </div>
-          <div className="form-actions full-width">
-            <button type="submit">{submitButtonText}</button>
-            <button type="button" onClick={clearSearchAndForm} className="secondary-button">Clear Form</button>
+          <div className="form-actions">
+            <button type="submit" className="form-submit-btn">
+              {submitButtonText}
+            </button>
+            <button type="button" onClick={clearSearchAndForm} className="form-clear-btn">
+              Clear Form
+            </button>
           </div>
         </form>
       </div>
       <div className="sub-section">
-        <h3>Existing Subjects</h3>
+        <h2>Existing Subjects</h2>
         <div className="filter-controls">
           <input
             type="text"
@@ -230,11 +250,14 @@ function AcademicManagement() {
             placeholder="Search by Name or Code"
             value={searchTerm}
             onChange={handleSearchChange}
+            className="filter-input"
           />
-          <button onClick={clearSearchAndForm} className="secondary-button">Clear Filter</button>
+          <button onClick={clearSearchAndForm} className="filter-clear-btn">
+            Clear Filter / Reset Form
+          </button>
         </div>
         <div className="table-container">
-          <table id="subjectTable">
+          <table className="subject-table">
             <thead>
               <tr>
                 <th>Subject Name</th>
@@ -244,11 +267,11 @@ function AcademicManagement() {
             </thead>
             <tbody>
               {filteredSubjects.length > 0 ? (
-                filteredSubjects.map(subject => (
-                  <tr key={subject._id}>
+                filteredSubjects.map((subject, index) => (
+                  <tr key={subject._id} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
                     <td>{subject.subjectName}</td>
                     <td>{subject.subjectCode}</td>
-                    <td className="action-buttons">
+                    <td className="table-actions">
                       <button
                         className="action-btn edit-btn"
                         onClick={() => editSubject(subject.subjectCode)}>
@@ -264,19 +287,13 @@ function AcademicManagement() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="3">No subjects found.</td>
+                  <td colSpan="3" className="no-data">No subjects found.</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
-      <ConfirmModal
-        isOpen={isModalOpen}
-        message={`Are you sure you want to delete subject: ${subjectToDelete}?`}
-        onConfirm={confirmDelete}
-        onCancel={cancelDelete}
-      />
     </div>
   );
 }

@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useLocalStorage from '../hooks/useLocalStorage';
+import ConfirmModal from '../components/ConfirmModal';
+
 
 function MarkAttendance() {
   const navigate = useNavigate();
@@ -16,30 +18,38 @@ function MarkAttendance() {
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   const [studentsInClass, setStudentsInClass] = useState([]);
-  const [currentAttendance, setCurrentAttendance] = useState({}); // { studentId: status, ... }
-  const [message, setMessage] = useState(null); // Success/Error messages
+  const [currentAttendance, setCurrentAttendance] = useState({});
+  const [message, setMessage] = useState(null);
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+  const [isModalAlert, setIsModalAlert] = useState(false);
+  const [modalAction, setModalAction] = useState(() => {});
+
+  const showAlert = (msg) => {
+    setModalMessage(msg);
+    setIsModalAlert(true);
+    setIsModalOpen(true);
+  };
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('loggedInUser'));
-    // Ensure logged-in user is staff and has 'Teacher' role
     if (user && user.type === 'staff' && user.role.includes('Teacher')) {
       setLoggedInStaff(user);
     } else {
-      navigate('/login'); // Redirect if not authorized
+      navigate('/login');
     }
   }, [navigate]);
 
-  // Derive unique classes assigned to the logged-in teacher
   const teacherAssignedClasses = loggedInStaff?.assignedClasses || [];
   const uniqueClasses = [...new Set(teacherAssignedClasses)].sort();
 
-  // Effect to filter students when class or students data changes
   useEffect(() => {
     if (selectedClass) {
       const filtered = students.filter(student => student.studentClass === selectedClass);
       setStudentsInClass(filtered);
 
-      // Initialize attendance for this class and date
       const existingAttendanceForDate = attendanceRecords.filter(
         rec => rec.date === selectedDate && rec.class === selectedClass
       );
@@ -49,14 +59,14 @@ function MarkAttendance() {
         const existingRecord = existingAttendanceForDate.find(
           rec => rec.studentId === student.admissionNo
         );
-        initialAttendanceState[student.admissionNo] = existingRecord ? existingRecord.status : 'Present'; // Default to Present
+        initialAttendanceState[student.admissionNo] = existingRecord ? existingRecord.status : 'Present';
       });
       setCurrentAttendance(initialAttendanceState);
     } else {
       setStudentsInClass([]);
       setCurrentAttendance({});
     }
-    setMessage(null); // Clear messages when class/date changes
+    setMessage(null);
   }, [selectedClass, selectedDate, students, attendanceRecords]);
 
 
@@ -72,30 +82,29 @@ function MarkAttendance() {
     setMessage(null);
 
     if (!selectedClass || !selectedDate) {
-      setMessage({ type: 'error', text: 'Please select a class and date.' });
+      showAlert('Please select a class and date.');
       return;
     }
 
     if (studentsInClass.length === 0) {
-      setMessage({ type: 'error', text: 'No students found in the selected class. Cannot mark attendance.' });
+      showAlert('No students found in the selected class. Cannot mark attendance.');
       return;
     }
 
     const newRecords = [];
     studentsInClass.forEach(student => {
       newRecords.push({
-        id: `${selectedDate}-${selectedClass}-${student.admissionNo}`, // Unique ID for attendance record
+        id: `${selectedDate}-${selectedClass}-${student.admissionNo}`,
         date: selectedDate,
         class: selectedClass,
         studentId: student.admissionNo,
-        status: currentAttendance[student.admissionNo] || 'Present', // Ensure a status is recorded
+        status: currentAttendance[student.admissionNo] || 'Present',
         markedBy: loggedInStaff.staffId,
         timestamp: new Date().toISOString()
       });
     });
 
     try {
-        // Clear existing records for the day/class combination
         const recordsToDelete = attendanceRecords.filter(
             rec => rec.date === selectedDate && rec.class === selectedClass
         );
@@ -106,7 +115,6 @@ function MarkAttendance() {
         );
         await Promise.all(deletePromises);
 
-        // Add the new records
         const createPromises = newRecords.map(rec =>
             fetch('http://localhost:5000/api/schoolPortalAttendance', {
                 method: 'POST',
@@ -116,17 +124,16 @@ function MarkAttendance() {
         );
         await Promise.all(createPromises);
 
-        // Fetch the updated list from the backend to refresh state
         const updatedResponse = await fetch('http://localhost:5000/api/schoolPortalAttendance');
         if (updatedResponse.ok) {
             const updatedRecords = await updatedResponse.json();
             setAttendanceRecords(updatedRecords);
-            setMessage({ type: 'success', text: `Attendance for ${selectedClass} on ${selectedDate} saved successfully!` });
+            showAlert(`Attendance for ${selectedClass} on ${selectedDate} saved successfully!`);
         } else {
-            setMessage({ type: 'error', text: 'Failed to save attendance. Please try again.' });
+            showAlert('Failed to save attendance. Please try again.');
         }
     } catch (err) {
-      setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
+      showAlert('An unexpected error occurred. Please check your network connection.');
     }
   };
 
@@ -139,30 +146,31 @@ function MarkAttendance() {
     return <div className="content-section">Access Denied. Please log in as a Teacher.</div>;
   }
 
-  // Disable submit if no class or date, or no students
   const isSubmitDisabled = !selectedClass || !selectedDate || studentsInClass.length === 0;
 
   return (
     <div className="content-section">
+      <ConfirmModal
+        isOpen={isModalOpen}
+        message={modalMessage}
+        onConfirm={() => setIsModalOpen(false)}
+        onCancel={() => setIsModalOpen(false)}
+        isAlert={isModalAlert}
+      />
       <h1>Mark Student Attendance</h1>
       <p>Welcome, {loggedInStaff.firstname} {loggedInStaff.surname}! Mark attendance for your assigned classes.</p>
 
       <div className="sub-section">
         <h2>Select Class and Date</h2>
-        {message && (
-          <div style={{ padding: '10px', marginBottom: '15px', borderRadius: '5px', color: 'white', backgroundColor: message.type === 'success' ? '#28a745' : '#dc3545' }}>
-            {message.text}
-          </div>
-        )}
-        <form onSubmit={handleSubmitAttendance}>
-          <div style={{ marginBottom: '10px' }}>
-            <label htmlFor="classSelect">Select Class:</label>
+        <form onSubmit={handleSubmitAttendance} className="attendance-form">
+          <div className="form-group">
+            <label htmlFor="classSelect" className="form-label">Select Class:</label>
             <select
               id="classSelect"
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
               required
-              style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
+              className="form-input"
             >
               <option value="">-- Select Class --</option>
               {uniqueClasses.map(cls => (
@@ -172,22 +180,22 @@ function MarkAttendance() {
             </select>
           </div>
 
-          <div style={{ marginBottom: '20px' }}>
-            <label htmlFor="attendanceDate">Select Date:</label>
+          <div className="form-group">
+            <label htmlFor="attendanceDate" className="form-label">Select Date:</label>
             <input
               type="date"
               id="attendanceDate"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
               required
-              style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
+              className="form-input"
             />
           </div>
 
           {selectedClass && selectedDate && studentsInClass.length > 0 && (
-            <div className="table-container" style={{ marginTop: '20px' }}>
-              <h3>Students in {selectedClass} on {selectedDate}</h3>
-              <table>
+            <div className="table-container form-group-full">
+              <h3 className="table-title">Students in {selectedClass} on {selectedDate}</h3>
+              <table className="attendance-table">
                 <thead>
                   <tr>
                     <th>S/N</th>
@@ -198,7 +206,7 @@ function MarkAttendance() {
                 </thead>
                 <tbody>
                   {studentsInClass.map((student, index) => (
-                    <tr key={student._id}>
+                    <tr key={student._id} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
                       <td>{index + 1}</td>
                       <td>{getStudentName(student.admissionNo)}</td>
                       <td>{student.admissionNo}</td>
@@ -206,7 +214,7 @@ function MarkAttendance() {
                         <select
                           value={currentAttendance[student.admissionNo] || 'Present'}
                           onChange={(e) => handleAttendanceChange(student.admissionNo, e.target.value)}
-                          style={{ padding: '5px', borderRadius: '4px', border: '1px solid #ccc' }}
+                          className="status-select"
                         >
                           <option value="Present">Present</option>
                           <option value="Absent">Absent</option>
@@ -220,12 +228,14 @@ function MarkAttendance() {
             </div>
           )}
 
-          <button type="submit" disabled={isSubmitDisabled} style={{ marginTop: '20px', opacity: isSubmitDisabled ? 0.6 : 1 }}>
-            Save Attendance
-          </button>
+          <div className="form-actions form-group-full">
+            <button type="submit" disabled={isSubmitDisabled} className="form-submit-btn" style={{ opacity: isSubmitDisabled ? 0.6 : 1 }}>
+              Save Attendance
+            </button>
+          </div>
         </form>
       </div>
-      <button onClick={() => navigate('/staff-dashboard')} style={{ marginTop: '20px', backgroundColor: '#6c757d', borderColor: '#6c757d' }}>Back to Dashboard</button>
+      <button onClick={() => navigate('/staff-dashboard')} className="back-button">Back to Dashboard</button>
     </div>
   );
 }

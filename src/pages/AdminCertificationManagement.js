@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useLocalStorage from '../hooks/useLocalStorage';
+import ConfirmModal from '../components/ConfirmModal';
+
 
 function AdminCertificationManagement() {
   const navigate = useNavigate();
@@ -17,9 +19,9 @@ function AdminCertificationManagement() {
     studentAdmissionNo: '',
     subjectCode: '',
     date: '',
-    objScore: '', // Score for Objective
-    theoryScore: '', // Score for Theory
-    pracScore: '', // Score for Practical
+    objScore: '',
+    theoryScore: '',
+    pracScore: '',
     totalScore: 0,
     grade: '',
     qualified: false,
@@ -30,6 +32,30 @@ function AdminCertificationManagement() {
   const [isEditing, setIsEditing] = useState(false);
   const [editResultId, setEditResultId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // State for table sorting
+  const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'descending' });
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+  const [modalAction, setModalAction] = useState(() => {});
+  const [isModalAlert, setIsModalAlert] = useState(false);
+
+  // Helper functions for modal control
+  const showConfirm = (msg, action) => {
+    setModalMessage(msg);
+    setModalAction(() => action);
+    setIsModalAlert(false);
+    setIsModalOpen(true);
+  };
+
+  const showAlert = (msg, action = () => {}) => {
+    setModalMessage(msg);
+    setModalAction(() => action);
+    setIsModalAlert(true);
+    setIsModalOpen(true);
+  };
 
   // Protect the route
   useEffect(() => {
@@ -44,7 +70,7 @@ function AdminCertificationManagement() {
   // Helper functions
   const getStudentName = (admissionNo) => {
     const student = students.find(s => s.admissionNo === admissionNo);
-    return student ? `${student.firstName} ${student.lastName} (${student.admissionNo})` : 'Unknown Student';
+    return student ? `${student.firstName} ${student.lastName}` : 'Unknown Student';
   };
 
   const getSubjectName = (subjectCode) => {
@@ -56,9 +82,7 @@ function AdminCertificationManagement() {
   const calculateGradeAndQualification = (total) => {
     let grade = '';
     let qualified = false;
-
-    // Scale is: 9,8 = Zenith, 7,6 = Legends, 5,4 = Economy, <4 = Not qualified
-    const scaledScore = (total / 100) * 9; // Assuming total is out of 100
+    const scaledScore = (total / 100) * 9;
 
     if (scaledScore >= 8.0) {
       grade = 'Zenith';
@@ -73,7 +97,6 @@ function AdminCertificationManagement() {
       grade = 'Not Qualified';
       qualified = false;
     }
-
     return { grade, qualified };
   };
 
@@ -82,18 +105,14 @@ function AdminCertificationManagement() {
     if (!resultForm.studentAdmissionNo) errors.studentAdmissionNo = 'Student is required.';
     if (!resultForm.subjectCode) errors.subjectCode = 'Subject is required.';
     if (!resultForm.date) errors.date = 'Date is required.';
-    if (resultForm.objScore === '' || resultForm.theoryScore === '' || resultForm.pracScore === '') {
-      errors.scores = 'All scores are required.';
-    }
     
-    // Check if scores are valid numbers
-    const scoreFields = ['objScore', 'theoryScore', 'pracScore'];
-    scoreFields.forEach(field => {
-      const score = parseFloat(resultForm[field]);
-      if (isNaN(score) || score < 0 || score > 100) {
-        errors.scores = 'Scores must be numbers between 0 and 100.';
-      }
-    });
+    const objScore = parseFloat(resultForm.objScore);
+    const theoryScore = parseFloat(resultForm.theoryScore);
+    const pracScore = parseFloat(resultForm.pracScore);
+
+    if (isNaN(objScore) || objScore < 0 || objScore > 100) errors.objScore = 'Score must be between 0 and 100.';
+    if (isNaN(theoryScore) || theoryScore < 0 || theoryScore > 100) errors.theoryScore = 'Score must be between 0 and 100.';
+    if (isNaN(pracScore) || pracScore < 0 || pracScore > 100) errors.pracScore = 'Score must be between 0 and 100.';
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -111,11 +130,10 @@ function AdminCertificationManagement() {
     setMessage(null);
 
     if (!validateForm()) {
-      setMessage({ type: 'error', text: 'Please correct the errors in the form.' });
+      showAlert('Please correct the errors in the form.');
       return;
     }
     
-    // Calculate total score and grade
     const totalScore = parseFloat(resultForm.objScore) + parseFloat(resultForm.theoryScore) + parseFloat(resultForm.pracScore);
     const { grade, qualified } = calculateGradeAndQualification(totalScore);
 
@@ -139,10 +157,10 @@ function AdminCertificationManagement() {
           setCertificationResults(prev =>
             prev.map(res => (res._id === updatedResult._id ? updatedResult : res))
           );
-          setMessage({ type: 'success', text: 'Certification result updated successfully!' });
+          showAlert('Certification result updated successfully!');
         } else {
           const errorData = await response.json();
-          setMessage({ type: 'error', text: errorData.message || 'Failed to update certification result.' });
+          showAlert(errorData.message || 'Failed to update certification result.');
         }
       } else {
         const response = await fetch('http://localhost:5000/api/schoolPortalCertificationResults', {
@@ -153,17 +171,16 @@ function AdminCertificationManagement() {
         if (response.ok) {
           const newResult = await response.json();
           setCertificationResults(prev => [...prev, newResult]);
-          setMessage({ type: 'success', text: 'New certification result added successfully!' });
+          showAlert('New certification result added successfully!');
         } else {
           const errorData = await response.json();
-          setMessage({ type: 'error', text: errorData.message || 'Failed to add new certification result.' });
+          showAlert(errorData.message || 'Failed to add new certification result.');
         }
       }
     } catch (err) {
-      setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
+      showAlert('An unexpected error occurred. Please check your network connection.');
     }
 
-    // Reset form
     setResultForm({
       studentAdmissionNo: '',
       subjectCode: '',
@@ -191,23 +208,26 @@ function AdminCertificationManagement() {
     }
   };
 
-  const deleteResult = async (idToDelete) => {
-    if (window.confirm('Are you sure you want to delete this result?')) {
-      try {
-        const response = await fetch(`http://localhost:5000/api/schoolPortalCertificationResults/${idToDelete}`, {
-          method: 'DELETE',
-        });
-        if (response.ok) {
-          setCertificationResults(prev => prev.filter(res => res._id !== idToDelete));
-          setMessage({ type: 'success', text: 'Certification result deleted successfully!' });
-        } else {
-          const errorData = await response.json();
-          setMessage({ type: 'error', text: errorData.message || 'Failed to delete certification result.' });
+  const deleteResult = (idToDelete) => {
+    showConfirm(
+      'Are you sure you want to delete this result?',
+      async () => {
+        try {
+          const response = await fetch(`http://localhost:5000/api/schoolPortalCertificationResults/${idToDelete}`, {
+            method: 'DELETE',
+          });
+          if (response.ok) {
+            setCertificationResults(prev => prev.filter(res => res._id !== idToDelete));
+            showAlert('Certification result deleted successfully!');
+          } else {
+            const errorData = await response.json();
+            showAlert(errorData.message || 'Failed to delete certification result.');
+          }
+        } catch (err) {
+          showAlert('An unexpected error occurred. Please check your network connection.');
         }
-      } catch (err) {
-        setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
       }
-    }
+    );
   };
 
   const clearForm = () => {
@@ -227,36 +247,73 @@ function AdminCertificationManagement() {
     setFormErrors({});
     setMessage(null);
   };
-
-  const filteredResults = certificationResults.filter(res =>
-    getStudentName(res.studentAdmissionNo).toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getSubjectName(res.subjectCode).toLowerCase().includes(searchTerm.toLowerCase())
-  ).sort((a, b) => new Date(b.date) - new Date(a.date));
   
+  // Sorting logic
+  const sortTable = (key) => {
+    let direction = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedResults = [...certificationResults]
+    .filter(res =>
+      getStudentName(res.studentAdmissionNo).toLowerCase().includes(searchTerm.toLowerCase()) ||
+      getSubjectName(res.subjectCode).toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      let keyA = a[sortConfig.key];
+      let keyB = b[sortConfig.key];
+      
+      // Special handling for nested values (student name) and dates
+      if (sortConfig.key === 'studentAdmissionNo') {
+        keyA = getStudentName(keyA);
+        keyB = getStudentName(keyB);
+      } else if (sortConfig.key === 'date') {
+        keyA = new Date(keyA);
+        keyB = new Date(keyB);
+      }
+
+      if (keyA < keyB) {
+        return sortConfig.direction === 'ascending' ? -1 : 1;
+      }
+      if (keyA > keyB) {
+        return sortConfig.direction === 'ascending' ? 1 : -1;
+      }
+      return 0;
+    });
+
   if (!loggedInAdmin) {
     return <div className="content-section">Access Denied. Please log in as an Admin.</div>;
   }
 
   return (
     <div className="content-section">
+      <ConfirmModal
+        isOpen={isModalOpen}
+        message={modalMessage}
+        onConfirm={() => { modalAction(); setIsModalOpen(false); }}
+        onCancel={() => setIsModalOpen(false)}
+        isAlert={isModalAlert}
+      />
       <h1>Certification Management</h1>
       <div className="sub-section">
         <h2>{isEditing ? 'Edit Certification Result' : 'Add New Certification Result'}</h2>
         {message && (
-          <div style={{ padding: '10px', marginBottom: '15px', borderRadius: '5px', color: 'white', backgroundColor: message.type === 'success' ? '#28a745' : '#dc3545' }}>
+          <div className={`form-message form-message-${message.type}`}>
             {message.text}
           </div>
         )}
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '10px' }}>
-            <label htmlFor="studentAdmissionNo" style={{ display: 'block', marginBottom: '5px' }}>Student:</label>
+        <form onSubmit={handleSubmit} className="cert-form">
+          <div className="form-group">
+            <label htmlFor="studentAdmissionNo" className="form-label">Student:</label>
             <select
               id="studentAdmissionNo"
               value={resultForm.studentAdmissionNo}
               onChange={handleChange}
-              required
-              style={{ borderColor: formErrors.studentAdmissionNo ? 'red' : '' }}
               disabled={isEditing}
+              className={`form-input ${formErrors.studentAdmissionNo ? 'form-input-error' : ''}`}
             >
               <option value="">-- Select Student --</option>
               {students.map(student => (
@@ -265,89 +322,91 @@ function AdminCertificationManagement() {
                 </option>
               ))}
             </select>
-            {formErrors.studentAdmissionNo && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.studentAdmissionNo}</p>}
+            {formErrors.studentAdmissionNo && <p className="error-message">{formErrors.studentAdmissionNo}</p>}
           </div>
 
-          <div style={{ marginBottom: '10px' }}>
-            <label htmlFor="subjectCode" style={{ display: 'block', marginBottom: '5px' }}>Subject:</label>
+          <div className="form-group">
+            <label htmlFor="subjectCode" className="form-label">Subject:</label>
             <select
               id="subjectCode"
               value={resultForm.subjectCode}
               onChange={handleChange}
-              required
-              style={{ borderColor: formErrors.subjectCode ? 'red' : '' }}
               disabled={isEditing}
+              className={`form-input ${formErrors.subjectCode ? 'form-input-error' : ''}`}
             >
               <option value="">-- Select Subject --</option>
               {subjects.map(subject => (
                 <option key={subject._id} value={subject.subjectCode}>{getSubjectName(subject.subjectCode)}</option>
               ))}
             </select>
-            {formErrors.subjectCode && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.subjectCode}</p>}
+            {formErrors.subjectCode && <p className="error-message">{formErrors.subjectCode}</p>}
           </div>
 
-          <div style={{ marginBottom: '10px' }}>
-            <label htmlFor="date" style={{ display: 'block', marginBottom: '5px' }}>Date:</label>
+          <div className="form-group">
+            <label htmlFor="date" className="form-label">Date:</label>
             <input
               type="date"
               id="date"
               value={resultForm.date}
               onChange={handleChange}
-              required
-              style={{ borderColor: formErrors.date ? 'red' : '' }}
+              className={`form-input ${formErrors.date ? 'form-input-error' : ''}`}
             />
-            {formErrors.date && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.date}</p>}
+            {formErrors.date && <p className="error-message">{formErrors.date}</p>}
           </div>
 
-          <div style={{ marginBottom: '10px' }}>
-            <label htmlFor="objScore" style={{ display: 'block', marginBottom: '5px' }}>Obj Score:</label>
+          <div className="form-group">
+            <label htmlFor="objScore" className="form-label">Obj Score:</label>
             <input
               type="number"
               id="objScore"
               value={resultForm.objScore}
               onChange={handleChange}
-              required
               min="0"
               max="100"
               placeholder="Objective Score"
-              style={{ borderColor: formErrors.scores ? 'red' : '' }}
+              className={`form-input ${formErrors.objScore ? 'form-input-error' : ''}`}
             />
+            {formErrors.objScore && <p className="error-message">{formErrors.objScore}</p>}
           </div>
 
-          <div style={{ marginBottom: '10px' }}>
-            <label htmlFor="theoryScore" style={{ display: 'block', marginBottom: '5px' }}>Theory Score:</label>
+          <div className="form-group">
+            <label htmlFor="theoryScore" className="form-label">Theory Score:</label>
             <input
               type="number"
               id="theoryScore"
               value={resultForm.theoryScore}
               onChange={handleChange}
-              required
               min="0"
               max="100"
               placeholder="Theory Score"
-              style={{ borderColor: formErrors.scores ? 'red' : '' }}
+              className={`form-input ${formErrors.theoryScore ? 'form-input-error' : ''}`}
             />
+            {formErrors.theoryScore && <p className="error-message">{formErrors.theoryScore}</p>}
           </div>
 
-          <div style={{ marginBottom: '10px' }}>
-            <label htmlFor="pracScore" style={{ display: 'block', marginBottom: '5px' }}>Practical Score:</label>
+          <div className="form-group">
+            <label htmlFor="pracScore" className="form-label">Practical Score:</label>
             <input
               type="number"
               id="pracScore"
               value={resultForm.pracScore}
               onChange={handleChange}
-              required
               min="0"
               max="100"
               placeholder="Practical Score"
-              style={{ borderColor: formErrors.scores ? 'red' : '' }}
+              className={`form-input ${formErrors.pracScore ? 'form-input-error' : ''}`}
             />
+            {formErrors.pracScore && <p className="error-message">{formErrors.pracScore}</p>}
           </div>
 
-          {formErrors.scores && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.scores}</p>}
-
-          <button type="submit">{isEditing ? 'Update Result' : 'Add Result'}</button>
-          <button type="button" onClick={clearForm} style={{ backgroundColor: '#6c757d', borderColor: '#6c757d' }}>Clear Form</button>
+          <div className="form-actions">
+            <button type="submit" className="form-submit-btn">
+              {isEditing ? 'Update Result' : 'Add Result'}
+            </button>
+            <button type="button" onClick={clearForm} className="form-clear-btn">
+              Clear Form
+            </button>
+          </div>
         </form>
       </div>
 
@@ -358,16 +417,15 @@ function AdminCertificationManagement() {
           placeholder="Search by student or subject"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ width: '100%', padding: '8px', marginBottom: '15px' }}
+          className="filter-input"
         />
         <div className="table-container">
-          <table>
+          <table className="cert-table">
             <thead>
               <tr>
-                <th>Std No.</th>
-                <th>Student Name</th>
-                <th>Subject</th>
-                <th>Date</th>
+                <th onClick={() => sortTable('studentAdmissionNo')}>Student Name (ID) {sortConfig.key === 'studentAdmissionNo' ? (sortConfig.direction === 'ascending' ? '▲' : '▼') : ''}</th>
+                <th onClick={() => sortTable('subjectCode')}>Subject {sortConfig.key === 'subjectCode' ? (sortConfig.direction === 'ascending' ? '▲' : '▼') : ''}</th>
+                <th onClick={() => sortTable('date')}>Date {sortConfig.key === 'date' ? (sortConfig.direction === 'ascending' ? '▲' : '▼') : ''}</th>
                 <th>Obj</th>
                 <th>Theory</th>
                 <th>Prac</th>
@@ -378,10 +436,9 @@ function AdminCertificationManagement() {
               </tr>
             </thead>
             <tbody>
-              {filteredResults.length > 0 ? (
-                filteredResults.map(res => (
-                  <tr key={res._id}>
-                    <td>{res.studentAdmissionNo}</td>
+              {sortedResults.length > 0 ? (
+                sortedResults.map((res, index) => (
+                  <tr key={res._id} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
                     <td>{getStudentName(res.studentAdmissionNo)}</td>
                     <td>{getSubjectName(res.subjectCode)}</td>
                     <td>{res.date}</td>
@@ -389,9 +446,9 @@ function AdminCertificationManagement() {
                     <td>{res.theoryScore}</td>
                     <td>{res.pracScore}</td>
                     <td><strong>{res.totalScore}</strong></td>
-                    <td style={{color: res.qualified ? 'green' : 'red'}}><strong>{res.grade}</strong></td>
-                    <td style={{color: res.qualified ? 'green' : 'red'}}>{res.qualified ? 'Yes' : 'No'}</td>
-                    <td>
+                    <td className={`grade-status grade-${res.grade.toLowerCase().replace(' ', '-')}`}><strong>{res.grade}</strong></td>
+                    <td className={`qualified-status qualified-${res.qualified}`}>{res.qualified ? 'Yes' : 'No'}</td>
+                    <td className="table-actions">
                       <button className="action-btn edit-btn" onClick={() => editResult(res._id)}>Edit</button>
                       <button className="action-btn delete-btn" onClick={() => deleteResult(res._id)}>Delete</button>
                     </td>
@@ -399,7 +456,7 @@ function AdminCertificationManagement() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="11">No certification results found.</td>
+                  <td colSpan="10" className="no-data">No certification results found.</td>
                 </tr>
               )}
             </tbody>

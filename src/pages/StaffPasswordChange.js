@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useLocalStorage from '../hooks/useLocalStorage';
+import ConfirmModal from '../components/ConfirmModal';
+
 
 // Import the password icon
 import passwordIcon from '../icon/password.png';
@@ -11,41 +13,58 @@ function StaffPasswordChange() {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
-  const [message, setMessage] = useState(''); // For success or error messages
+  const [formErrors, setFormErrors] = useState({});
 
   const [staffs, setStaffs] = useLocalStorage('schoolPortalStaff', [], 'http://localhost:5000/api/schoolPortalStaff');
   const navigate = useNavigate();
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+  const [isModalAlert, setIsModalAlert] = useState(false);
+
+  const showAlert = (msg, action = () => {}) => {
+    setModalMessage(msg);
+    setIsModalAlert(true);
+    setIsModalOpen(true);
+  };
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('loggedInUser'));
     if (user && user.type === 'staff') {
       setLoggedInStaff(user);
     } else {
-      navigate('/login'); // Redirect if not logged in as staff
+      navigate('/login');
     }
   }, [navigate]);
 
+  const validateForm = () => {
+    const errors = {};
+    if (newPassword.length < 6) {
+      errors.newPassword = 'New password must be at least 6 characters long.';
+    }
+    if (newPassword !== confirmNewPassword) {
+      errors.confirmNewPassword = 'New passwords do not match.';
+    }
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handlePasswordChange = async (e) => {
     e.preventDefault();
-    setMessage(''); // Clear previous messages
+    setFormErrors({});
 
     if (!loggedInStaff) {
-      setMessage('Error: Not logged in as a staff member.');
+      showAlert('Error: Not logged in as a staff member.');
       return;
     }
-
-    if (newPassword.length < 6) { // Simple validation for new password
-      setMessage('New password must be at least 6 characters long.');
-      return;
-    }
-
-    if (newPassword !== confirmNewPassword) {
-      setMessage('New password and confirm password do not match.');
+    
+    if (!validateForm()) {
+      showAlert('Please correct the errors in the form.');
       return;
     }
 
     try {
-      // Simulate sending data to a secure backend API
       const response = await fetch(`http://localhost:5000/api/change-password/${loggedInStaff._id}`, {
         method: 'POST',
         headers: {
@@ -57,9 +76,10 @@ function StaffPasswordChange() {
       const data = await response.json();
 
       if (response.ok) {
-        setMessage('Password changed successfully! You will be logged out. Please log in with your new password.');
+        showAlert('Password changed successfully! You will be logged out. Please log in with your new password.', () => {
+          handleLogout();
+        });
         
-        // Update local state and localStorage for consistency after a successful change
         const updatedStaffs = staffs.map(s => {
           if (s.staffId === loggedInStaff.staffId) {
             return { ...s, password: newPassword }; 
@@ -69,17 +89,12 @@ function StaffPasswordChange() {
         setStaffs(updatedStaffs); 
         localStorage.setItem('loggedInUser', JSON.stringify({ ...loggedInStaff, password: newPassword }));
 
-        // Log out user after successful password change for security
-        setTimeout(() => {
-          handleLogout();
-        }, 2000);
-
       } else {
-        setMessage(data.message || 'An error occurred during password change.');
+        showAlert(data.message || 'An error occurred during password change.');
       }
     } catch (error) {
       console.error('Password change error:', error);
-      setMessage('An unexpected error occurred. Please check your network connection.');
+      showAlert('An unexpected error occurred. Please check your network connection.');
     }
   };
 
@@ -94,51 +109,65 @@ function StaffPasswordChange() {
 
   return (
     <div className="content-section">
+      <ConfirmModal
+        isOpen={isModalOpen}
+        message={modalMessage}
+        onConfirm={() => setIsModalOpen(false)}
+        onCancel={() => setIsModalOpen(false)}
+        isAlert={isModalAlert}
+      />
       <h1>Change Password (Staff View)</h1>
       <p>Welcome, {loggedInStaff.firstname} {loggedInStaff.surname}! You can change your password here:</p>
 
-      <form onSubmit={handlePasswordChange} style={{ border: '1px solid #ccc', padding: '20px', borderRadius: '8px', marginTop: '20px', backgroundColor: '#f9f9f9', maxWidth: '400px', margin: '20px auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <img src={passwordIcon} alt="Password Icon" width="80px" height="80px" />
+      <form onSubmit={handlePasswordChange} className="password-change-form">
+        <div className="form-icon-container">
+          <img src={passwordIcon} alt="Password Icon" className="form-icon" />
         </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label htmlFor="oldPassword" style={{ display: 'block', marginBottom: '5px' }}>Old Password:</label>
+        <div className="form-group">
+          <label htmlFor="oldPassword" className="form-label">Old Password:</label>
           <input
             type="password"
             id="oldPassword"
             required
             value={oldPassword}
             onChange={(e) => setOldPassword(e.target.value)}
-            style={{ width: '100%', padding: '8px', boxSizing: 'border-box', border: '1px solid #ddd', borderRadius: '4px' }}
+            className="form-input"
           />
         </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label htmlFor="newPassword" style={{ display: 'block', marginBottom: '5px' }}>New Password:</label>
+        <div className="form-group">
+          <label htmlFor="newPassword" className="form-label">New Password:</label>
           <input
             type="password"
             id="newPassword"
             required
             value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            style={{ width: '100%', padding: '8px', boxSizing: 'border-box', border: '1px solid #ddd', borderRadius: '4px' }}
+            onChange={(e) => {
+              setNewPassword(e.target.value);
+              setFormErrors(prev => ({...prev, newPassword: ''}));
+            }}
+            className={`form-input ${formErrors.newPassword ? 'form-input-error' : ''}`}
           />
+          {formErrors.newPassword && <p className="error-message">{formErrors.newPassword}</p>}
         </div>
-        <div style={{ marginBottom: '20px' }}>
-          <label htmlFor="confirmNewPassword" style={{ display: 'block', marginBottom: '5px' }}>Confirm New Password:</label>
+        <div className="form-group">
+          <label htmlFor="confirmNewPassword" className="form-label">Confirm New Password:</label>
           <input
             type="password"
             id="confirmNewPassword"
             required
             value={confirmNewPassword}
-            onChange={(e) => setConfirmNewPassword(e.target.value)}
-            style={{ width: '100%', padding: '8px', boxSizing: 'border-box', border: '1px solid #ddd', borderRadius: '4px' }}
+            onChange={(e) => {
+              setConfirmNewPassword(e.target.value);
+              setFormErrors(prev => ({...prev, confirmNewPassword: ''}));
+            }}
+            className={`form-input ${formErrors.confirmNewPassword ? 'form-input-error' : ''}`}
           />
+          {formErrors.confirmNewPassword && <p className="error-message">{formErrors.confirmNewPassword}</p>}
         </div>
-        {message && <p style={{ color: message.includes('success') ? 'green' : 'red', marginBottom: '15px', textAlign: 'center' }}>{message}</p>}
-        <button type="submit" style={{ width: '100%', padding: '10px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Change Password</button>
+        <button type="submit" className="form-submit-btn">Change Password</button>
       </form>
 
-      <button onClick={handleLogout} style={{ marginTop: '20px' }}>Logout</button>
+      <button onClick={handleLogout} className="logout-button">Logout</button>
     </div>
   );
 }

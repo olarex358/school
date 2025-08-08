@@ -1,18 +1,31 @@
 // src/pages/StudentSyllabus.js
-import React, { useState, useEffect } from 'react'; // Corrected '=>' to 'from'
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useLocalStorage from '../hooks/useLocalStorage';
+import ConfirmModal from '../components/ConfirmModal';
+
 
 // Import the syllabus icon
-import syllabusIcon from '../icon/sylabus.png'; // Corrected spelling
+import syllabusIcon from '../icon/sylabus.png';
 
 function StudentSyllabus() {
   const [loggedInStudent, setLoggedInStudent] = useState(null);
   const navigate = useNavigate();
-  // Load syllabus entries
+  
   const [allSyllabusEntries, , loadingSyllabus] = useLocalStorage('schoolPortalSyllabusEntries', [], 'http://localhost:5000/api/schoolPortalSyllabusEntries');
   const [subjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
 
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+  const [isModalAlert, setIsModalAlert] = useState(false);
+
+  const showAlert = (msg) => {
+    setModalMessage(msg);
+    setIsModalAlert(true);
+    setIsModalOpen(true);
+  };
+  
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('loggedInUser'));
     if (user && user.type === 'student') {
@@ -31,7 +44,6 @@ function StudentSyllabus() {
     return <div className="content-section">Loading syllabus...</div>;
   }
 
-  // Filter syllabus entries relevant to this student (all, or specific class/subject)
   const studentRelevantSyllabus = allSyllabusEntries.filter(entry =>
     (entry.audience === 'all' || entry.audience === 'students') &&
     (entry.applicableClass === 'all' || entry.applicableClass === loggedInStudent.studentClass)
@@ -48,33 +60,50 @@ function StudentSyllabus() {
 
   return (
     <div className="content-section">
+      <ConfirmModal
+        isOpen={isModalOpen}
+        message={modalMessage}
+        onConfirm={() => setIsModalOpen(false)}
+        onCancel={() => setIsModalOpen(false)}
+        isAlert={isModalAlert}
+      />
       <h1>My Syllabus</h1>
       <p>Welcome, {loggedInStudent.firstName} {loggedInStudent.lastName}! Here are your relevant syllabus outlines:</p>
 
       {studentRelevantSyllabus.length > 0 ? (
-        studentRelevantSyllabus.map(entry => (
-          <div key={entry._id} style={{ border: '1px solid #ccc', padding: '15px', marginBottom: '15px', borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
-              <img src={syllabusIcon} alt="Syllabus Icon" width="40px" height="40px" style={{ marginRight: '15px', flexShrink: 0 }} />
-              <div>
-                <h3>{entry.title}</h3>
-                <p><strong>Class:</strong> {entry.applicableClass === 'all' ? 'All Classes' : entry.applicableClass}</p>
-                <p><strong>Subject:</strong> {entry.applicableSubject === 'all' ? 'All Subjects' : getSubjectName(entry.applicableSubject)}</p>
-                <p style={{ marginTop: '5px' }}>{entry.description.substring(0, 150)}...</p>
+        <div className="syllabus-grid">
+          {studentRelevantSyllabus.map(entry => (
+            <div key={entry._id} className="syllabus-card">
+              <div className="syllabus-header">
+                <img src={syllabusIcon} alt="Syllabus Icon" className="syllabus-icon" />
+                <div className="syllabus-info">
+                  <h3 className="syllabus-title">{entry.title}</h3>
+                  <p className="syllabus-meta">
+                    <strong>Class:</strong> {entry.applicableClass === 'all' ? 'All Classes' : entry.applicableClass}
+                  </p>
+                  <p className="syllabus-meta">
+                    <strong>Subject:</strong> {entry.applicableSubject === 'all' ? 'All Subjects' : getSubjectName(entry.applicableSubject)}
+                  </p>
+                </div>
               </div>
+              <p className="syllabus-description">
+                {entry.description}
+              </p>
+              <p className="syllabus-audience">
+                Audience: {entry.audience.charAt(0).toUpperCase() + entry.audience.slice(1)}
+              </p>
             </div>
-            <p style={{ marginTop: '10px', fontStyle: 'italic', color: '#555' }}>Audience: {entry.audience.charAt(0).toUpperCase() + entry.audience.slice(1)}</p>
-          </div>
-        ))
+          ))}
+        </div>
       ) : (
-        <p>No syllabus entries posted for you yet.</p>
+        <p className="no-data-message">No syllabus entries posted for you yet.</p>
       )}
 
-      <p style={{ marginTop: '20px' }}>
+      <p className="mt-4">
         For detailed subject-specific syllabus and learning objectives, please refer to the academic department or your subject teachers.
       </p>
 
-      <button onClick={handleLogout} style={{ marginTop: '20px' }}>Logout</button>
+      <button onClick={handleLogout} className="logout-button">Logout</button>
     </div>
   );
 }

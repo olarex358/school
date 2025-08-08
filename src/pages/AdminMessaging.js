@@ -2,27 +2,35 @@
 import React, { useState, useEffect } from 'react';
 import useLocalStorage from '../hooks/useLocalStorage';
 import { useNavigate } from 'react-router-dom';
-import useNotifications from '../hooks/useNotifications';
+import ConfirmModal from '../components/ConfirmModal';
+
 
 function AdminMessaging() {
   const navigate = useNavigate();
   const [loggedInAdmin, setLoggedInAdmin] = useState(null);
 
-  // Update hooks to get data from the backend
   const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
   const [staffs] = useLocalStorage('schoolPortalStaff', [], 'http://localhost:5000/api/schoolPortalStaff');
   const [adminMessages, setAdminMessages, loadingMessages] = useLocalStorage('schoolPortalAdminMessages', [], 'http://localhost:5000/api/schoolPortalAdminMessages');
-  const { addNotification } = useNotifications();
 
-  // Form states
   const [recipientType, setRecipientType] = useState('allStudents');
   const [selectedRecipientId, setSelectedRecipientId] = useState('');
   const [messageSubject, setMessageSubject] = useState('');
   const [messageBody, setMessageBody] = useState('');
-
-  // Form feedback states
   const [formErrors, setFormErrors] = useState({});
-  const [message, setMessage] = useState(null);
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+  const [isModalAlert, setIsModalAlert] = useState(false);
+  const [modalAction, setModalAction] = useState(() => {});
+
+  const showAlert = (msg, action = () => {}) => {
+    setModalMessage(msg);
+    setIsModalAlert(true);
+    setModalAction(() => action);
+    setIsModalOpen(true);
+  };
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('loggedInUser'));
@@ -53,9 +61,8 @@ function AdminMessaging() {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    setMessage(null);
     if (!validateForm()) {
-      setMessage({ type: 'error', text: 'Please correct the errors in the form.' });
+      showAlert('Please correct the errors in the form.');
       return;
     }
     const newMessage = {
@@ -79,37 +86,13 @@ function AdminMessaging() {
         const createdMessage = await response.json();
         setAdminMessages(prevMessages => [...prevMessages, createdMessage]);
         
-        let notificationTitle = `New Admin Message: ${messageSubject}`;
-        let notificationBody = messageBody;
-        
-        if (recipientType.includes('individual')) {
-          const recipientName = recipientType === 'individualStudent'
-            ? (students.find(s => s.admissionNo === selectedRecipientId)?.firstName + ' ' + students.find(s => s.admissionNo === selectedRecipientId)?.lastName || selectedRecipientId)
-            : (staffs.find(s => s.staffId === selectedRecipientId)?.firstname + ' ' + staffs.find(s => s.staffId === selectedRecipientId)?.surname || selectedRecipientId);
-          addNotification({
-            title: notificationTitle,
-            body: notificationBody,
-            recipientType: recipientType,
-            recipientId: selectedRecipientId
-          });
-          setMessage({ type: 'success', text: `Message and notification sent to ${recipientName} (simulated email/WhatsApp).` });
-        } else if (recipientType.includes('all')) {
-          addNotification({
-            title: notificationTitle,
-            body: notificationBody,
-            recipientType: recipientType,
-            recipientId: null
-          });
-          setMessage({ type: 'success', text: `Message and notification sent to all ${recipientType.replace('all', '')} (simulated).` });
-        } else {
-          setMessage({ type: 'success', text: 'Message sent successfully (simulated).' });
-        }
+        showAlert(`Message sent to ${recipientType.replace('individual', '').replace('all', '')} successfully!`);
       } else {
         const errorData = await response.json();
-        setMessage({ type: 'error', text: errorData.message || 'Failed to send message.' });
+        showAlert(errorData.message || 'Failed to send message.');
       }
     } catch (err) {
-      setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
+      showAlert('An unexpected error occurred. Please check your network connection.');
     }
 
     setSelectedRecipientId('');
@@ -137,23 +120,24 @@ function AdminMessaging() {
 
   return (
     <div className="content-section">
+      <ConfirmModal
+        isOpen={isModalOpen}
+        message={modalMessage}
+        onConfirm={() => setIsModalOpen(false)}
+        isAlert={isModalAlert}
+      />
       <h1>Admin Messaging</h1>
       <p>Compose and send internal messages to students and staff.</p>
       <div className="sub-section">
         <h2>Compose New Message</h2>
-        {message && (
-          <div style={{ padding: '10px', marginBottom: '15px', borderRadius: '5px', color: 'white', backgroundColor: message.type === 'success' ? '#28a745' : '#dc3545' }}>
-            {message.text}
-          </div>
-        )}
-        <form onSubmit={handleSendMessage}>
-          <div style={{ marginBottom: '15px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <label htmlFor="recipientType">Send To:</label>
+        <form onSubmit={handleSendMessage} className="messaging-form">
+          <div className="form-group form-group-full">
+            <label htmlFor="recipientType" className="form-label">Send To:</label>
             <select
               id="recipientType"
               value={recipientType}
               onChange={(e) => { setSelectedRecipientId(''); setRecipientType(e.target.value); setFormErrors({}); }}
-              style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+              className="form-input"
             >
               <option value="allStudents">All Students</option>
               <option value="individualStudent">Individual Student</option>
@@ -162,49 +146,51 @@ function AdminMessaging() {
             </select>
           </div>
           {(recipientType === 'individualStudent' || recipientType === 'individualStaff') && (
-            <div style={{ marginBottom: '15px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <label htmlFor="selectedRecipientId">Select Recipient:</label>
+            <div className="form-group form-group-full">
+              <label htmlFor="selectedRecipientId" className="form-label">Select Recipient:</label>
               <select
                 id="selectedRecipientId"
                 value={selectedRecipientId}
                 onChange={(e) => { setSelectedRecipientId(e.target.value); setFormErrors(prev => ({ ...prev, selectedRecipientId: '' })); }}
-                style={{ padding: '8px', borderRadius: '4px', border: formErrors.selectedRecipientId ? 'red' : '1px solid #ccc' }}
+                className={`form-input ${formErrors.selectedRecipientId ? 'form-input-error' : ''}`}
               >
                 <option value="">-- Select --</option>
                 {getRecipientOptions().map(opt => (
                   <option key={opt.id} value={opt.id}>{opt.name}</option>
                 ))}
               </select>
-              {formErrors.selectedRecipientId && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.selectedRecipientId}</p>}
+              {formErrors.selectedRecipientId && <p className="error-message">{formErrors.selectedRecipientId}</p>}
             </div>
           )}
-          <div style={{ marginBottom: '15px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <label htmlFor="messageSubject">Subject:</label>
+          <div className="form-group form-group-full">
+            <label htmlFor="messageSubject" className="form-label">Subject:</label>
             <input
               type="text"
               id="messageSubject"
               value={messageSubject}
               onChange={(e) => { setMessageSubject(e.target.value); setFormErrors(prev => ({ ...prev, messageSubject: '' })); }}
-              style={{ padding: '8px', borderRadius: '4px', border: formErrors.messageSubject ? 'red' : '1px solid #ccc' }}
+              className={`form-input ${formErrors.messageSubject ? 'form-input-error' : ''}`}
               required
             />
-            {formErrors.messageSubject && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.messageSubject}</p>}
+            {formErrors.messageSubject && <p className="error-message">{formErrors.messageSubject}</p>}
           </div>
-          <div style={{ marginBottom: '15px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <label htmlFor="messageBody">Message:</label>
+          <div className="form-group form-group-full">
+            <label htmlFor="messageBody" className="form-label">Message:</label>
             <textarea
               id="messageBody"
               value={messageBody}
               onChange={(e) => { setMessageBody(e.target.value); setFormErrors(prev => ({ ...prev, messageBody: '' })); }}
               rows="5"
-              style={{ padding: '8px', borderRadius: '4px', border: formErrors.messageBody ? 'red' : '1px solid #ccc' }}
+              className={`form-input ${formErrors.messageBody ? 'form-input-error' : ''}`}
               required
             ></textarea>
-            {formErrors.messageBody && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.messageBody}</p>}
+            {formErrors.messageBody && <p className="error-message">{formErrors.messageBody}</p>}
           </div>
-          <button type="submit" style={{ padding: '10px 20px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
-            Send Message
-          </button>
+          <div className="form-actions form-group-full">
+            <button type="submit" className="form-submit-btn">
+              Send Message
+            </button>
+          </div>
         </form>
       </div>
     </div>

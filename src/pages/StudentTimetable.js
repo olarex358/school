@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useLocalStorage from '../hooks/useLocalStorage';
+import ConfirmModal from '../components/ConfirmModal';
+
 
 // Reusing calendar icon for timetable
 import timetableIcon from '../icon/calender.png';
@@ -10,15 +12,24 @@ function StudentTimetable() {
   const navigate = useNavigate();
   const [loggedInStudent, setLoggedInStudent] = useState(null);
 
-  // Load all timetable entries and subjects
   const [allTimetableEntries, , loadingTimetable] = useLocalStorage('schoolPortalTimetables', [], 'http://localhost:5000/api/schoolPortalTimetables');
   const [subjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
   const [staffs] = useLocalStorage('schoolPortalStaff', [], 'http://localhost:5000/api/schoolPortalStaff');
 
   const [studentSpecificTimetable, setStudentSpecificTimetable] = useState([]);
-  const [daysOfWeek] = useState(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]);
+  const [daysOfWeek] = useState(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]); // Removed weekend days for typical school schedule
 
-  // Protect the route and filter timetable
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+  const [isModalAlert, setIsModalAlert] = useState(false);
+
+  const showAlert = (msg) => {
+    setModalMessage(msg);
+    setIsModalAlert(true);
+    setIsModalOpen(true);
+  };
+
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('loggedInUser'));
     if (user && user.type === 'student') {
@@ -33,7 +44,7 @@ function StudentTimetable() {
       const filteredForStudent = allTimetableEntries.filter(
         entry => entry.classSelect === loggedInStudent.studentClass
       ).sort((a, b) => {
-        const dayOrder = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+        const dayOrder = daysOfWeek;
         const dayComparison = dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day);
         if (dayComparison !== 0) return dayComparison;
         
@@ -43,9 +54,8 @@ function StudentTimetable() {
     } else {
       setStudentSpecificTimetable([]);
     }
-  }, [loggedInStudent, allTimetableEntries]);
+  }, [loggedInStudent, allTimetableEntries, daysOfWeek]);
 
-  // Helper functions for display
   const getSubjectName = (subjectCode) => {
     const subject = subjects.find(s => s.subjectCode === subjectCode);
     return subject ? subject.subjectName : subjectCode;
@@ -65,15 +75,13 @@ function StudentTimetable() {
     return <div className="content-section">Loading timetable...</div>;
   }
 
-  // Generate unique sorted time slots from the entries for column headers
   const uniqueTimeSlots = [...new Set(studentSpecificTimetable.map(entry => `${entry.startTime} - ${entry.endTime}`))].sort();
 
-  // Create a grid representation for easier rendering
   const timetableGrid = {};
   daysOfWeek.forEach(day => {
       timetableGrid[day] = {};
       uniqueTimeSlots.forEach(slot => {
-          timetableGrid[day][slot] = null; // Initialize as empty
+          timetableGrid[day][slot] = null;
       });
   });
 
@@ -86,6 +94,13 @@ function StudentTimetable() {
 
   return (
     <div className="content-section">
+      <ConfirmModal
+        isOpen={isModalOpen}
+        message={modalMessage}
+        onConfirm={() => setIsModalOpen(false)}
+        onCancel={() => setIsModalOpen(false)}
+        isAlert={isModalAlert}
+      />
       <h1>My Timetable</h1>
       <p>Welcome, {loggedInStudent.firstName} {loggedInStudent.lastName}! Here is your class timetable:</p>
       
@@ -101,36 +116,27 @@ function StudentTimetable() {
               </tr>
             </thead>
             <tbody>
-              {uniqueTimeSlots.map(slot => (
-                <tr key={slot}>
+              {uniqueTimeSlots.map((slot, index) => (
+                <tr key={slot} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
                   <td><strong>{slot}</strong></td>
                   {daysOfWeek.map(day => {
                     const entry = timetableGrid[day][slot];
                     return (
-                      <td key={day} style={{
-                        backgroundColor: entry ? (entry.type === 'Exam' ? 'var(--error-color)' : entry.type === 'CA' ? 'orange' : 'var(--secondary-teal)') : '#f0f0f0',
-                        color: entry ? 'white' : 'var(--text-color-dark)',
-                        border: entry ? '1px solid var(--secondary-teal)' : '1px dashed #ccc',
-                        padding: '10px',
-                        textAlign: 'center',
-                        verticalAlign: 'middle',
-                        minWidth: '120px'
-                      }}>
+                      <td key={day} className={`timetable-cell timetable-type-${entry?.type.toLowerCase()}`}>
                         {entry ? (
                           <>
-                            <p style={{ fontWeight: 'bold', margin: '0' }}>{getSubjectName(entry.subjectSelect)}</p>
-                            <small style={{ display: 'block', marginTop: '5px' }}>{getTeacherName(entry.teacherSelect)}</small>
-                            <small style={{ display: 'block', marginTop: '2px', fontStyle: 'italic' }}>({entry.location})</small>
+                            <p className="timetable-subject">{getSubjectName(entry.subjectSelect)}</p>
+                            <small className="timetable-teacher">{getTeacherName(entry.teacherSelect)}</small>
+                            <small className="timetable-location">({entry.location})</small>
                           </>
                         ) : (
-                          <span style={{ color: '#888' }}>-</span>
+                          <span className="empty-cell">-</span>
                         )}
                       </td>
                     );
                   })}
                 </tr>
               ))}
-
             </tbody>
           </table>
         </div>

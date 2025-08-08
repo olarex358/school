@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useLocalStorage from '../hooks/useLocalStorage';
 
+
 function StudentResults() {
   const [loggedInStudent, setLoggedInStudent] = useState(null);
   const navigate = useNavigate();
@@ -39,7 +40,6 @@ function StudentResults() {
       setStudentSpecificResults([]);
     }
   }, [loggedInStudent, allApprovedResults]);
-
 
   // Helper function to get grade and GPA points from a score
   const getGradeAndPoints = (score) => {
@@ -104,30 +104,32 @@ function StudentResults() {
     return <div className="content-section">Loading results...</div>;
   }
 
+  const gpaClass = gpa >= 4.0 ? 'gpa-green' : gpa >= 3.0 ? 'gpa-orange' : 'gpa-red';
+
   return (
     <div className="content-section">
       <h1>My Results</h1>
       <p>Welcome, {loggedInStudent.firstName} {loggedInStudent.lastName}!</p>
       
-      <div className="sub-section" style={{ display: 'flex', justifyContent: 'space-around', marginBottom: '20px' }}>
-          <div>
-              <h3>Total Score:</h3>
-              <p style={{fontSize: '1.5em', fontWeight: 'bold'}}>{totalScore}</p>
-          </div>
-          <div>
-              <h3>Average Score:</h3>
-              <p style={{fontSize: '1.5em', fontWeight: 'bold'}}>{averageScore}%</p>
-          </div>
-          <div>
-              <h3>GPA:</h3>
-              <p style={{fontSize: '1.5em', fontWeight: 'bold', color: gpa >= 4.0 ? 'green' : gpa >= 3.0 ? 'orange' : 'red'}}>{gpa}</p>
-          </div>
+      <div className="results-summary-card">
+        <div className="summary-item">
+            <h3 className="summary-title">Total Score:</h3>
+            <p className="summary-value">{totalScore}</p>
+        </div>
+        <div className="summary-item">
+            <h3 className="summary-title">Average Score:</h3>
+            <p className="summary-value">{averageScore}%</p>
+        </div>
+        <div className="summary-item">
+            <h3 className="summary-title">GPA:</h3>
+            <p className={`summary-value ${gpaClass}`}>{gpa}</p>
+        </div>
       </div>
       
       <h3>Your Academic Performance:</h3>
       {studentSpecificResults.length > 0 ? (
         <div className="table-container">
-          <table id="studentResultsTable">
+          <table className="results-table">
             <thead>
               <tr>
                 <th>Subject</th>
@@ -141,27 +143,27 @@ function StudentResults() {
               </tr>
             </thead>
             <tbody>
-              {studentSpecificResults.map(result => {
+              {studentSpecificResults.map((result, index) => {
                 const { total, grade } = calculateTotalAndGrade(result.firstCaScore, result.secondCaScore, result.assignmentScore, result.examScore);
                 return (
-                <tr key={result._id}>
+                <tr key={result._id} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
                   <td>{getSubjectName(result.subjectSelect)}</td>
                   <td>{result.termSelect}</td>
                   <td>{result.firstCaScore}</td>
                   <td>{result.secondCaScore}</td>
                   <td>{result.assignmentScore}</td>
                   <td>{result.examScore}</td>
-                  <td><strong>{total}</strong></td>
-                  <td><strong>{grade}</strong></td>
+                  <td className="total-score"><strong>{total}</strong></td>
+                  <td className={`grade-cell grade-${grade.toLowerCase()}`}><strong>{grade}</strong></td>
                 </tr>
               )})}
             </tbody>
           </table>
         </div>
       ) : (
-        <p>No results have been entered for you yet.</p>
+        <p className="no-data-message">No results have been entered for you yet.</p>
       )}
-      <button onClick={handleLogout} style={{ marginTop: '20px' }}>Logout</button>
+      <button onClick={handleLogout} className="logout-button">Logout</button>
     </div>
   );
 }

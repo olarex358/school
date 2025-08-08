@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useLocalStorage from '../hooks/useLocalStorage';
+import ConfirmModal from '../components/ConfirmModal';
+ // New CSS file for styling
 
 function AdminCalendarManagement() {
   const navigate = useNavigate();
@@ -21,6 +23,30 @@ function AdminCalendarManagement() {
   const [isEditing, setIsEditing] = useState(false);
   const [editEventId, setEditEventId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // State for table sorting
+  const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'ascending' });
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+  const [modalAction, setModalAction] = useState(() => {});
+  const [isModalAlert, setIsModalAlert] = useState(false);
+
+  // Helper functions for modal control
+  const showConfirm = (msg, action) => {
+    setModalMessage(msg);
+    setModalAction(() => action);
+    setIsModalAlert(false);
+    setIsModalOpen(true);
+  };
+
+  const showAlert = (msg, action = () => {}) => {
+    setModalMessage(msg);
+    setModalAction(() => action);
+    setIsModalAlert(true);
+    setIsModalOpen(true);
+  };
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('loggedInUser'));
@@ -48,29 +74,56 @@ function AdminCalendarManagement() {
     setMessage(null);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage(null);
     if (!validateForm()) {
-      setMessage({ type: 'error', text: 'Please correct the errors in the form.' });
+      showAlert('Please correct the errors in the form.');
       return;
     }
     const eventToAddOrUpdate = {
       ...eventForm,
-      id: isEditing ? editEventId : Date.now(),
       timestamp: new Date().toISOString()
     };
-    if (isEditing) {
-      setCalendarEvents(prevEvents =>
-        prevEvents.map(event =>
-          event.id === editEventId ? eventToAddOrUpdate : event
-        )
-      );
-      setMessage({ type: 'success', text: 'Calendar event updated successfully!' });
-    } else {
-      setCalendarEvents(prevEvents => [...prevEvents, eventToAddOrUpdate]);
-      setMessage({ type: 'success', text: 'Calendar event added successfully!' });
+    
+    try {
+      if (isEditing) {
+        const response = await fetch(`http://localhost:5000/api/schoolPortalCalendarEvents/${editEventId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(eventToAddOrUpdate),
+        });
+        if (response.ok) {
+          const updatedEvent = await response.json();
+          setCalendarEvents(prevEvents =>
+            prevEvents.map(event =>
+              event._id === updatedEvent._id ? updatedEvent : event
+            )
+          );
+          showAlert('Calendar event updated successfully!');
+        } else {
+          const errorData = await response.json();
+          showAlert(errorData.message || 'Failed to update calendar event.');
+        }
+      } else {
+        const response = await fetch('http://localhost:5000/api/schoolPortalCalendarEvents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(eventToAddOrUpdate),
+        });
+        if (response.ok) {
+          const newEvent = await response.json();
+          setCalendarEvents(prevEvents => [...prevEvents, newEvent]);
+          showAlert('Calendar event added successfully!');
+        } else {
+          const errorData = await response.json();
+          showAlert(errorData.message || 'Failed to add new calendar event.');
+        }
+      }
+    } catch (err) {
+      showAlert('An unexpected error occurred. Please check your network connection.');
     }
+    
     setEventForm({ title: '', date: '', description: '', audience: 'all' });
     setIsEditing(false);
     setEditEventId(null);
@@ -78,7 +131,7 @@ function AdminCalendarManagement() {
   };
 
   const editEvent = (idToEdit) => {
-    const event = calendarEvents.find(e => e.id === idToEdit);
+    const event = calendarEvents.find(e => e._id === idToEdit);
     if (event) {
       setEventForm(event);
       setIsEditing(true);
@@ -89,10 +142,25 @@ function AdminCalendarManagement() {
   };
 
   const deleteEvent = (idToDelete) => {
-    if (window.confirm('Are you sure you want to delete this event?')) {
-      setCalendarEvents(prevEvents => prevEvents.filter(event => event.id !== idToDelete));
-      setMessage({ type: 'success', text: 'Event deleted successfully!' });
-    }
+    showConfirm(
+      'Are you sure you want to delete this event?',
+      async () => {
+        try {
+          const response = await fetch(`http://localhost:5000/api/schoolPortalCalendarEvents/${idToDelete}`, {
+            method: 'DELETE',
+          });
+          if (response.ok) {
+            setCalendarEvents(prevEvents => prevEvents.filter(event => event._id !== idToDelete));
+            showAlert('Event deleted successfully!');
+          } else {
+            const errorData = await response.json();
+            showAlert(errorData.message || 'Failed to delete event.');
+          }
+        } catch (err) {
+          showAlert('An unexpected error occurred. Please check your network connection.');
+        }
+      }
+    );
   };
 
   const clearForm = () => {
@@ -102,12 +170,40 @@ function AdminCalendarManagement() {
     setFormErrors({});
     setMessage(null);
   };
+  
+  // Sorting logic
+  const sortTable = (key) => {
+    let direction = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
 
-  const filteredEvents = calendarEvents.filter(event =>
-    event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    event.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    event.date.includes(searchTerm)
-  );
+  const sortedEvents = [...calendarEvents]
+    .filter(event =>
+      event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      event.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      event.date.includes(searchTerm)
+    )
+    .sort((a, b) => {
+      let keyA = a[sortConfig.key];
+      let keyB = b[sortConfig.key];
+      
+      // Special handling for date sorting
+      if (sortConfig.key === 'date') {
+        keyA = new Date(keyA);
+        keyB = new Date(keyB);
+      }
+      
+      if (keyA < keyB) {
+        return sortConfig.direction === 'ascending' ? -1 : 1;
+      }
+      if (keyA > keyB) {
+        return sortConfig.direction === 'ascending' ? 1 : -1;
+      }
+      return 0;
+    });
 
   if (!loggedInAdmin) {
     return <div className="content-section">Access Denied. Please log in as an Admin.</div>;
@@ -119,68 +215,79 @@ function AdminCalendarManagement() {
 
   return (
     <div className="content-section">
+      <ConfirmModal
+        isOpen={isModalOpen}
+        message={modalMessage}
+        onConfirm={() => { modalAction(); setIsModalOpen(false); }}
+        onCancel={() => setIsModalOpen(false)}
+        isAlert={isModalAlert}
+      />
       <h1>Calendar Management</h1>
       <div className="sub-section">
         <h2>{isEditing ? 'Edit Calendar Event' : 'Add New Calendar Event'}</h2>
         {message && (
-          <div style={{ padding: '10px', marginBottom: '15px', borderRadius: '5px', color: 'white', backgroundColor: message.type === 'success' ? '#28a745' : '#dc3545' }}>
+          <div className={`form-message form-message-${message.type}`}>
             {message.text}
           </div>
         )}
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
-            <label htmlFor="title" style={{ display: 'block', marginBottom: '5px' }}>Event Title:</label>
+        <form onSubmit={handleSubmit} className="calendar-form">
+          <div className="form-group">
+            <label htmlFor="title" className="form-label">Event Title:</label>
             <input
               type="text"
               id="title"
               value={eventForm.title}
               onChange={handleChange}
-              required
-              style={{ borderColor: formErrors.title ? 'red' : '' }}
+              placeholder="e.g., Mid-Term Break"
+              className={`form-input ${formErrors.title ? 'form-input-error' : ''}`}
             />
-            {formErrors.title && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.title}</p>}
+            {formErrors.title && <p className="error-message">{formErrors.title}</p>}
           </div>
-          <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
-            <label htmlFor="date" style={{ display: 'block', marginBottom: '5px' }}>Date:</label>
+          <div className="form-group">
+            <label htmlFor="date" className="form-label">Date:</label>
             <input
               type="date"
               id="date"
               value={eventForm.date}
               onChange={handleChange}
-              required
-              style={{ borderColor: formErrors.date ? 'red' : '' }}
+              className={`form-input ${formErrors.date ? 'form-input-error' : ''}`}
             />
-            {formErrors.date && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.date}</p>}
+            {formErrors.date && <p className="error-message">{formErrors.date}</p>}
           </div>
-          <div style={{ marginBottom: '10px', flex: '1 1 100%' }}>
-            <label htmlFor="description" style={{ display: 'block', marginBottom: '5px' }}>Description:</label>
+          <div className="form-group form-group-full">
+            <label htmlFor="description" className="form-label">Description:</label>
             <textarea
               id="description"
               value={eventForm.description}
               onChange={handleChange}
-              required
               rows="3"
-              style={{ borderColor: formErrors.description ? 'red' : '' }}
+              placeholder="A brief description of the event."
+              className={`form-input ${formErrors.description ? 'form-input-error' : ''}`}
             ></textarea>
-            {formErrors.description && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.description}</p>}
+            {formErrors.description && <p className="error-message">{formErrors.description}</p>}
           </div>
-          <div style={{ marginBottom: '10px', flex: '1 1 calc(50% - 7.5px)' }}>
-            <label htmlFor="audience" style={{ display: 'block', marginBottom: '5px' }}>Audience:</label>
+          <div className="form-group form-group-full">
+            <label htmlFor="audience" className="form-label">Audience:</label>
             <select
               id="audience"
               value={eventForm.audience}
               onChange={handleChange}
-              required
-              style={{ borderColor: formErrors.audience ? 'red' : '' }}
+              className={`form-input ${formErrors.audience ? 'form-input-error' : ''}`}
             >
               <option value="all">All (Students & Staff)</option>
               <option value="students">Students Only</option>
               <option value="staff">Staff Only</option>
             </select>
-            {formErrors.audience && <p style={{ color: 'red', fontSize: '0.8em' }}>{formErrors.audience}</p>}
+            {formErrors.audience && <p className="error-message">{formErrors.audience}</p>}
           </div>
-          <button type="submit" style={{ flex: '1 1 calc(50% - 7.5px)' }}>{isEditing ? 'Update Event' : 'Add Event'}</button>
-          <button type="button" onClick={clearForm} style={{ flex: '1 1 calc(50% - 7.5px)', backgroundColor: '#6c757d', borderColor: '#6c757d' }}>Clear Form</button>
+          <div className="form-actions">
+            <button type="submit" className="form-submit-btn">
+              {isEditing ? 'Update Event' : 'Add Event'}
+            </button>
+            <button type="button" onClick={clearForm} className="form-clear-btn">
+              Clear Form
+            </button>
+          </div>
         </form>
       </div>
       <div className="sub-section">
@@ -190,36 +297,36 @@ function AdminCalendarManagement() {
           placeholder="Search events..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ width: '100%', padding: '8px', marginBottom: '15px' }}
+          className="filter-input"
         />
         <div className="table-container">
-          <table>
+          <table className="calendar-table">
             <thead>
               <tr>
-                <th>Title</th>
-                <th>Date</th>
+                <th onClick={() => sortTable('title')}>Title {sortConfig.key === 'title' ? (sortConfig.direction === 'ascending' ? '▲' : '▼') : ''}</th>
+                <th onClick={() => sortTable('date')}>Date {sortConfig.key === 'date' ? (sortConfig.direction === 'ascending' ? '▲' : '▼') : ''}</th>
                 <th>Description</th>
-                <th>Audience</th>
+                <th onClick={() => sortTable('audience')}>Audience {sortConfig.key === 'audience' ? (sortConfig.direction === 'ascending' ? '▲' : '▼') : ''}</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredEvents.length > 0 ? (
-                filteredEvents.map(event => (
-                  <tr key={event.id}>
+              {sortedEvents.length > 0 ? (
+                sortedEvents.map((event, index) => (
+                  <tr key={event._id} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
                     <td>{event.title}</td>
                     <td>{event.date}</td>
                     <td>{event.description}</td>
                     <td>{event.audience.charAt(0).toUpperCase() + event.audience.slice(1)}</td>
-                    <td>
-                      <button className="action-btn edit-btn" onClick={() => editEvent(event.id)}>Edit</button>
-                      <button className="action-btn delete-btn" onClick={() => deleteEvent(event.id)}>Delete</button>
+                    <td className="table-actions">
+                      <button className="action-btn edit-btn" onClick={() => editEvent(event._id)}>Edit</button>
+                      <button className="action-btn delete-btn" onClick={() => deleteEvent(event._id)}>Delete</button>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="5">No calendar events found.</td>
+                  <td colSpan="5" className="no-data">No calendar events found.</td>
                 </tr>
               )}
             </tbody>
