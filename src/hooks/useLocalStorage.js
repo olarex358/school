@@ -1,8 +1,20 @@
 // src/hooks/useLocalStorage.js
 import { useState, useEffect } from 'react';
+import { useData } from '../context/DataContext';
 
-function useLocalStorage(key, initialValue, backendUrl) {
-  const [storedValue, setStoredValue] = useState(() => {
+function useLocalStorage(key, initialValue) {
+  // Now we use the data from the centralized context instead of local state
+  const { 
+    students, staffs, subjects, results, pendingResults,
+    certificationResults, feeRecords, calendarEvents,
+    syllabusEntries, digitalLibrary, users, adminMessages,
+    certificationRegistrations, attendanceRecords, timetables,
+    loading, error
+  } = useData();
+
+  // The state is now managed at the top level in DataContext, but we can
+  // still provide local state for form inputs or other temporary data.
+  const [localState, setLocalState] = useState(() => {
     try {
       const item = window.localStorage.getItem(key);
       return item && item !== 'undefined' ? JSON.parse(item) : initialValue;
@@ -12,55 +24,51 @@ function useLocalStorage(key, initialValue, backendUrl) {
     }
   });
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
+  // This effect ensures local state stays in sync with localStorage if needed
   useEffect(() => {
-    if (backendUrl) {
-      setLoading(true);
-      setError(null);
-
-      const fetchData = async () => {
-        try {
-          const response = await fetch(backendUrl);
-          if (!response.ok) {
-            throw new Error(`Failed to fetch from backend: ${response.statusText}`);
-          }
-          const data = await response.json();
-          setStoredValue(data);
-          window.localStorage.setItem(key, JSON.stringify(data));
-          setLoading(false);
-        } catch (err) {
-          console.warn(`Backend fetch failed for key "${key}". Falling back to localStorage.`, err);
-          setError(err);
-          setLoading(false);
-        }
-      };
-
-      fetchData();
-    }
-  }, [key, backendUrl]);
-
-  useEffect(() => {
-    if (!backendUrl) {
-      try {
-        window.localStorage.setItem(key, JSON.stringify(storedValue));
-      } catch (error) {
-        console.error(`Error writing to localStorage key "${key}":`, error);
-      }
-    }
-  }, [key, storedValue, backendUrl]);
-  
-  const setLocalValue = (value) => {
     try {
-      setStoredValue(value);
-      window.localStorage.setItem(key, JSON.stringify(value));
+      window.localStorage.setItem(key, JSON.stringify(localState));
     } catch (error) {
-      console.error(`Error setting localStorage key "${key}":`, error);
+      console.error(`Error writing to localStorage key "${key}":`, error);
     }
-  };
-
-  return [storedValue, setLocalValue, loading, error];
+  }, [key, localState]);
+  
+  // This hook now returns the relevant data from the context
+  // based on the key, and still allows local state updates.
+  switch (key) {
+    case 'schoolPortalStudents':
+      return [students, setLocalState, loading, error];
+    case 'schoolPortalStaff':
+      return [staffs, setLocalState, loading, error];
+    case 'schoolPortalSubjects':
+      return [subjects, setLocalState, loading, error];
+    case 'schoolPortalResults':
+      return [results, setLocalState, loading, error];
+    case 'schoolPortalPendingResults':
+      return [pendingResults, setLocalState, loading, error];
+    case 'schoolPortalCertificationResults':
+      return [certificationResults, setLocalState, loading, error];
+    case 'schoolPortalFeeRecords':
+      return [feeRecords, setLocalState, loading, error];
+    case 'schoolPortalCalendarEvents':
+      return [calendarEvents, setLocalState, loading, error];
+    case 'schoolPortalSyllabusEntries':
+      return [syllabusEntries, setLocalState, loading, error];
+    case 'schoolPortalDigitalLibrary':
+      return [digitalLibrary, setLocalState, loading, error];
+    case 'schoolPortalUsers':
+      return [users, setLocalState, loading, error];
+    case 'schoolPortalAdminMessages':
+      return [adminMessages, setLocalState, loading, error];
+    case 'schoolPortalCertificationRegistrations':
+      return [certificationRegistrations, setLocalState, loading, error];
+    case 'schoolPortalAttendance':
+      return [attendanceRecords, setLocalState, loading, error];
+    case 'schoolPortalTimetables':
+      return [timetables, setLocalState, loading, error];
+    default:
+      return [localState, setLocalState, loading, error];
+  }
 }
 
 export default useLocalStorage;

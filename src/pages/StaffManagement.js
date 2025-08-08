@@ -1,19 +1,18 @@
 // src/pages/StaffManagement.js
-import React, { useState, useEffect, Fragment } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import useLocalStorage from '../hooks/useLocalStorage';
+import { useData } from '../context/DataContext';
+import { uploadFile } from '../utils/uploadFile';
 import ConfirmModal from '../components/ConfirmModal';
+
 
 function StaffManagement() {
   const navigate = useNavigate();
   const [loggedInAdmin, setLoggedInAdmin] = useState(null);
 
-  // Data from the backend via a custom hook
-  const [staffs, setStaffs, loadingStaffs] = useLocalStorage('schoolPortalStaff', [], 'http://localhost:5000/api/schoolPortalStaff');
-  const [subjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
-  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
+  const { staffs, setStaffs, subjects, students, loading, error } = useData();
   
-  const initialStaffState = {
+  const [newStaff, setNewStaff] = useState({
     surname: '',
     firstname: '',
     staffId: '',
@@ -26,23 +25,34 @@ function StaffManagement() {
     contactPhone: '',
     resumeDocument: '',
     assignedSubjects: [],
-    assignedClasses: [],
-    password: ''
-  };
-
-  const [newStaff, setNewStaff] = useState(initialStaffState);
+    assignedClasses: []   
+  });
+  
+  const [selectedFile, setSelectedFile] = useState(null);
   const [submitButtonText, setSubmitButtonText] = useState('Add Staff');
   const [isEditing, setIsEditing] = useState(false);
   const [editStaffId, setEditStaffId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [formErrors, setFormErrors] = useState({});
-  const [message, setMessage] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [staffToDelete, setStaffToDelete] = useState(null);
 
-  // Derived data for form dropdowns
-  const uniqueClasses = [...new Set(students.map(s => s.studentClass))].sort();
-  const uniqueSubjects = [...new Set(subjects.map(s => s.subjectCode))].sort();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+  const [modalAction, setModalAction] = useState(() => {});
+  const [isModalAlert, setIsModalAlert] = useState(false);
+
+  const showConfirm = (msg, action) => {
+    setModalMessage(msg);
+    setModalAction(() => action);
+    setIsModalAlert(false);
+    setIsModalOpen(true);
+  };
+
+  const showAlert = (msg, action = () => {}) => {
+    setModalMessage(msg);
+    setModalAction(() => action);
+    setIsModalAlert(true);
+    setIsModalOpen(true);
+  };
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('loggedInUser'));
@@ -52,6 +62,9 @@ function StaffManagement() {
       navigate('/login');
     }
   }, [navigate]);
+
+  const uniqueClasses = [...new Set(students.map(s => s.studentClass))].sort();
+  const uniqueSubjects = [...new Set(subjects.map(s => s.subjectCode))].sort();
 
   const validateField = (name, value) => {
     let error = '';
@@ -70,27 +83,18 @@ function StaffManagement() {
         if (!value) error = 'Date of employment is required.';
         break;
       case 'contactEmail':
-        if (!value.trim()) {
-          error = 'Email is required.';
-        } else if (!/\S+@\S+\.\S+/.test(value)) {
-          error = 'Invalid email format.';
-        }
+        if (!value.trim()) error = 'Email is required.';
+        if (!/\S+@\S+\.\S+/.test(value)) error = 'Invalid email format.';
         break;
       case 'contactPhone':
-        if (!value.trim()) {
-          error = 'Phone number is required.';
-        } else if (!/^\d{10,15}$/.test(value)) {
-          error = 'Invalid phone number (10-15 digits).';
-        }
+        if (!value.trim()) error = 'Phone number is required.';
+        if (!/^\d{10,15}$/.test(value)) error = 'Invalid phone number (10-15 digits).';
         break;
       case 'assignedSubjects':
         if (newStaff.role.includes('Teacher') && value.length === 0) error = 'Teachers must be assigned at least one subject.';
         break;
       case 'assignedClasses':
         if (newStaff.role.includes('Teacher') && value.length === 0) error = 'Teachers must be assigned at least one class.';
-        break;
-      case 'password':
-        if (!isEditing && !value) error = 'Password is required for new staff.';
         break;
       default:
         break;
@@ -102,22 +106,37 @@ function StaffManagement() {
     const { id, value, type, files, options, multiple } = e.target;
     if (type === 'file') {
       const file = files[0];
+      setSelectedFile(file);
       setNewStaff(prevStaff => ({
         ...prevStaff,
         [id]: file ? file.name : ''
       }));
-      setFormErrors(prevErrors => ({ ...prevErrors, [id]: '' }));
+      setFormErrors(prevErrors => ({
+        ...prevErrors,
+        [id]: ''
+      }));
     } else if (multiple) {
       const selectedValues = Array.from(options)
         .filter(option => option.selected)
         .map(option => option.value);
-      setNewStaff(prevStaff => ({ ...prevStaff, [id]: selectedValues }));
-      setFormErrors(prevErrors => ({ ...prevErrors, [id]: validateField(id, selectedValues) }));
+      setNewStaff(prevStaff => ({
+        ...prevStaff,
+        [id]: selectedValues
+      }));
+      setFormErrors(prevErrors => ({
+        ...prevErrors,
+        [id]: validateField(id, selectedValues)
+      }));
     } else {
-      setNewStaff(prevStaff => ({ ...prevStaff, [id]: value }));
-      setFormErrors(prevErrors => ({ ...prevErrors, [id]: validateField(id, value) }));
+      setNewStaff(prevStaff => ({
+        ...prevStaff,
+        [id]: value
+      }));
+      setFormErrors(prevErrors => ({
+        ...prevErrors,
+        [id]: validateField(id, value)
+      }));
     }
-    setMessage(null);
   };
 
   const generateStaffId = () => {
@@ -131,15 +150,14 @@ function StaffManagement() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage(null);
+
     let errors = {};
     Object.keys(newStaff).forEach(key => {
-      if (key !== 'staffId' && key !== 'resumeDocument' && key !== 'password') {
+      if (key !== 'staffId' && key !== 'resumeDocument') {
         const error = validateField(key, newStaff[key]);
         if (error) errors[key] = error;
       }
     });
-
     if (newStaff.role.includes('Teacher')) {
       if (newStaff.assignedSubjects.length === 0) {
         errors.assignedSubjects = 'Teachers must be assigned at least one subject.';
@@ -148,34 +166,36 @@ function StaffManagement() {
         errors.assignedClasses = 'Teachers must be assigned at least one class.';
       }
     }
-
-    if (!isEditing && !newStaff.password) {
-      errors.password = 'Password is required for new staff.';
-    }
-
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
-      setMessage({ type: 'error', text: 'Please correct the errors in the form.' });
+      showAlert('Please correct the errors in the form.');
       return;
+    }
+
+    let resumeDocPath = newStaff.resumeDocument;
+    if (selectedFile) {
+      try {
+        resumeDocPath = await uploadFile(selectedFile);
+      } catch (err) {
+        showAlert(err.message);
+        return;
+      }
     }
 
     let finalStaffId = newStaff.staffId;
     if (!isEditing) {
       finalStaffId = generateStaffId();
     }
-    
-    const staffToSave = { 
-      ...newStaff, 
-      staffId: finalStaffId, 
-      username: finalStaffId,
-      password: newStaff.password || (isEditing ? undefined : 'password123')
-    };
+    const staffToSave = { ...newStaff, staffId: finalStaffId, username: finalStaffId, resumeDocument: resumeDocPath };
     
     try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+
       if (isEditing) {
         const response = await fetch(`http://localhost:5000/api/schoolPortalStaff/${editStaffId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(staffToSave),
         });
         if (response.ok) {
@@ -185,31 +205,46 @@ function StaffManagement() {
               staff._id === updatedStaff._id ? updatedStaff : staff
             )
           );
-          setMessage({ type: 'success', text: 'Staff data updated successfully!' });
+          showAlert('Staff data updated successfully!');
         } else {
           const errorData = await response.json();
-          setMessage({ type: 'error', text: errorData.message || 'Failed to update staff.' });
+          showAlert(errorData.message || 'Failed to update staff.');
         }
       } else {
         const response = await fetch('http://localhost:5000/api/schoolPortalStaff', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(staffToSave),
         });
         if (response.ok) {
           const newStaffMember = await response.json();
           setStaffs(prevStaffs => [...prevStaffs, newStaffMember]);
-          setMessage({ type: 'success', text: 'New staff registered successfully!' });
+          showAlert('New staff registered successfully!');
         } else {
           const errorData = await response.json();
-          setMessage({ type: 'error', text: errorData.message || 'Failed to add new staff.' });
+          showAlert(errorData.message || 'Failed to add new staff.');
         }
       }
     } catch (err) {
-      setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
+      showAlert('An unexpected error occurred. Please check your network connection.');
     }
     
-    setNewStaff(initialStaffState);
+    setNewStaff({
+      surname: '',
+      firstname: '',
+      staffId: '',
+      role: '',
+      gender: '',
+      dateOfEmployment: '',
+      department: '',
+      qualifications: '',
+      contactEmail: '',
+      contactPhone: '',
+      resumeDocument: '',
+      assignedSubjects: [],
+      assignedClasses: []
+    });
+    setSelectedFile(null);
     setSubmitButtonText('Add Staff');
     setIsEditing(false);
     setFormErrors({});
@@ -218,46 +253,41 @@ function StaffManagement() {
   const editStaff = (staffIdToEdit) => {
     const staffToEdit = staffs.find(s => s.staffId === staffIdToEdit);
     if (staffToEdit) {
-      setNewStaff({ ...staffToEdit, password: '' });
+      setNewStaff(staffToEdit);
       setSubmitButtonText('Update Staff');
       setIsEditing(true);
       setEditStaffId(staffToEdit._id);
       setFormErrors({});
-      setMessage(null);
+      setSelectedFile(null);
     }
   };
   
-  const deleteStaff = async (staffIdToDelete) => {
-    setStaffToDelete(staffIdToDelete);
-    setIsModalOpen(true);
-  };
-
-  const confirmDelete = async () => {
-    setIsModalOpen(false);
-    const staffToDeleteData = staffs.find(s => s.staffId === staffToDelete);
-    if (!staffToDeleteData) {
-      setMessage({ type: 'error', text: 'Staff not found.' });
-      return;
-    }
-    try {
-      const response = await fetch(`http://localhost:5000/api/schoolPortalStaff/${staffToDeleteData._id}`, {
-        method: 'DELETE',
-      });
-      if (response.ok) {
-        setStaffs(prevStaffs => prevStaffs.filter(staff => staff.staffId !== staffToDelete));
-        setMessage({ type: 'success', text: 'Staff deleted successfully!' });
-      } else {
-        const errorData = await response.json();
-        setMessage({ type: 'error', text: errorData.message || 'Failed to delete staff.' });
+  const deleteStaff = (staffIdToDelete) => {
+    showConfirm(
+      `Are you sure you want to delete staff with ID: ${staffIdToDelete}?`,
+      async () => {
+        const staffToDelete = staffs.find(s => s.staffId === staffIdToDelete);
+        if (!staffToDelete) {
+          showAlert('Staff not found.');
+          return;
+        }
+        try {
+          const response = await fetch(`http://localhost:5000/api/schoolPortalStaff/${staffToDelete._id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+          });
+          if (response.ok) {
+            setStaffs(prevStaffs => prevStaffs.filter(staff => staff.staffId !== staffIdToDelete));
+            showAlert('Staff deleted successfully!');
+          } else {
+            const errorData = await response.json();
+            showAlert(errorData.message || 'Failed to delete staff.');
+          }
+        } catch (err) {
+          showAlert('An unexpected error occurred. Please check your network connection.');
+        }
       }
-    } catch (err) {
-      setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
-    }
-  };
-
-  const cancelDelete = () => {
-    setIsModalOpen(false);
-    setStaffToDelete(null);
+    );
   };
   
   const handleSearchChange = (e) => {
@@ -266,11 +296,25 @@ function StaffManagement() {
   
   const clearSearchAndForm = () => {
     setSearchTerm('');
-    setNewStaff(initialStaffState);
+    setNewStaff({
+      surname: '',
+      firstname: '',
+      staffId: '',
+      role: '',
+      gender: '',
+      dateOfEmployment: '',
+      department: '',
+      qualifications: '',
+      contactEmail: '',
+      contactPhone: '',
+      resumeDocument: '',
+      assignedSubjects: [],
+      assignedClasses: []
+    });
+    setSelectedFile(null);
     setSubmitButtonText('Add Staff');
     setIsEditing(false);
     setFormErrors({});
-    setMessage(null);
   };
   
   const filteredStaffs = staffs.filter(staff =>
@@ -282,53 +326,50 @@ function StaffManagement() {
     staff.contactEmail.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
-  if (!loggedInAdmin) {
-    return <div className="content-section">Access Denied. Please log in as an Admin.</div>;
+  if (!loggedInAdmin || loading) {
+      return <div className="content-section">Loading staff data...</div>;
   }
 
-  if (loadingStaffs) {
-      return <div className="content-section">Loading staff data...</div>;
+  if (error) {
+    return <div className="content-section">Error loading data: {error.message}</div>;
   }
   
   return (
     <div className="content-section">
+      <ConfirmModal 
+        isOpen={isModalOpen}
+        message={modalMessage}
+        onConfirm={() => { modalAction(); setIsModalOpen(false); }}
+        onCancel={() => setIsModalOpen(false)}
+        isAlert={isModalAlert}
+      />
       <h2>Staff Management</h2>
       <div className="sub-section">
-        <h3>{isEditing ? 'Edit Staff' : 'Register New Staff'}</h3>
-        {message && (
-          <div style={{ padding: '10px', marginBottom: '15px', borderRadius: '5px', color: 'white', backgroundColor: message.type === 'success' ? '#28a745' : '#dc3545' }}>
-            {message.text}
-          </div>
-        )}
-        <form id="teacherForm" onSubmit={handleSubmit}>
+        <h3>{isEditing ? 'Edit Staff' : 'Register/Edit Staff'}</h3>
+        <form id="teacherForm" onSubmit={handleSubmit} className="staff-form">
           <div className="form-group">
-            <label htmlFor="surname">Surname:</label>
             <input
               type="text"
               id="surname"
               placeholder="Surname"
-              required
               value={newStaff.surname}
               onChange={handleChange}
-              className={formErrors.surname ? 'input-error' : ''}
+              className={`form-input ${formErrors.surname ? 'form-input-error' : ''}`}
             />
-            {formErrors.surname && <p className="error-text">{formErrors.surname}</p>}
+            {formErrors.surname && <p className="error-message">{formErrors.surname}</p>}
           </div>
           <div className="form-group">
-            <label htmlFor="firstname">First name:</label>
             <input
               type="text"
               id="firstname"
               placeholder="First name"
-              required
               value={newStaff.firstname}
               onChange={handleChange}
-              className={formErrors.firstname ? 'input-error' : ''}
+              className={`form-input ${formErrors.firstname ? 'form-input-error' : ''}`}
             />
-            {formErrors.firstname && <p className="error-text">{formErrors.firstname}</p>}
+            {formErrors.firstname && <p className="error-message">{formErrors.firstname}</p>}
           </div>
           <div className="form-group">
-            <label htmlFor="staffId">Staff ID:</label>
             <input
               type="text"
               id="staffId"
@@ -336,126 +377,100 @@ function StaffManagement() {
               value={isEditing ? newStaff.staffId : generateStaffId()}
               readOnly
               disabled={!isEditing}
-              className={formErrors.staffId ? 'input-error' : ''}
+              className="form-input form-input-disabled"
             />
-            {formErrors.staffId && <p className="error-text">{formErrors.staffId}</p>}
+            {formErrors.staffId && <p className="error-message">{formErrors.staffId}</p>}
           </div>
           <div className="form-group">
-            <label htmlFor="role">Role:</label>
             <input
               type="text"
               id="role"
               placeholder="Role (e.g., Teacher, Admin)"
-              required
               value={newStaff.role}
               onChange={handleChange}
-              className={formErrors.role ? 'input-error' : ''}
+              className={`form-input ${formErrors.role ? 'form-input-error' : ''}`}
             />
-            {formErrors.role && <p className="error-text">{formErrors.role}</p>}
+            {formErrors.role && <p className="error-message">{formErrors.role}</p>}
           </div>
           <div className="form-group">
-            <label htmlFor="gender">Gender:</label>
             <select
               id="gender"
-              required
               value={newStaff.gender}
               onChange={handleChange}
-              className={formErrors.gender ? 'input-error' : ''}
+              className={`form-input ${formErrors.gender ? 'form-input-error' : ''}`}
             >
               <option value="">Select Gender</option>
               <option value="Male">Male</option>
               <option value="Female">Female</option>
               <option value="Other">Other</option>
             </select>
-            {formErrors.gender && <p className="error-text">{formErrors.gender}</p>}
+            {formErrors.gender && <p className="error-message">{formErrors.gender}</p>}
           </div>
           <div className="form-group">
-            <label htmlFor="dateOfEmployment">Date of Employment:</label>
+            <label htmlFor="dateOfEmployment" className="form-label">Date of Employment:</label>
             <input
               type="date"
               id="dateOfEmployment"
-              required
               value={newStaff.dateOfEmployment}
               onChange={handleChange}
-              className={formErrors.dateOfEmployment ? 'input-error' : ''}
+              className={`form-input ${formErrors.dateOfEmployment ? 'form-input-error' : ''}`}
             />
-            {formErrors.dateOfEmployment && <p className="error-text">{formErrors.dateOfEmployment}</p>}
+            {formErrors.dateOfEmployment && <p className="error-message">{formErrors.dateOfEmployment}</p>}
           </div>
           <div className="form-group">
-            <label htmlFor="department">Department:</label>
             <input
               type="text"
               id="department"
               placeholder="Department (e.g., Science, Arts)"
-              required
               value={newStaff.department}
               onChange={handleChange}
-              className={formErrors.department ? 'input-error' : ''}
+              className={`form-input ${formErrors.department ? 'form-input-error' : ''}`}
             />
-            {formErrors.department && <p className="error-text">{formErrors.department}</p>}
+            {formErrors.department && <p className="error-message">{formErrors.department}</p>}
           </div>
           <div className="form-group">
-            <label htmlFor="qualifications">Qualifications:</label>
             <input
               type="text"
               id="qualifications"
               placeholder="Qualifications (e.g., B.Sc. Education)"
-              required
               value={newStaff.qualifications}
               onChange={handleChange}
-              className={formErrors.qualifications ? 'input-error' : ''}
+              className={`form-input ${formErrors.qualifications ? 'form-input-error' : ''}`}
             />
-            {formErrors.qualifications && <p className="error-text">{formErrors.qualifications}</p>}
+            {formErrors.qualifications && <p className="error-message">{formErrors.qualifications}</p>}
           </div>
           <div className="form-group">
-            <label htmlFor="contactEmail">Contact Email:</label>
             <input
               type="email"
               id="contactEmail"
               placeholder="Contact Email"
-              required
               value={newStaff.contactEmail}
               onChange={handleChange}
-              className={formErrors.contactEmail ? 'input-error' : ''}
+              className={`form-input ${formErrors.contactEmail ? 'form-input-error' : ''}`}
             />
-            {formErrors.contactEmail && <p className="error-text">{formErrors.contactEmail}</p>}
+            {formErrors.contactEmail && <p className="error-message">{formErrors.contactEmail}</p>}
           </div>
           <div className="form-group">
-            <label htmlFor="contactPhone">Contact Phone:</label>
             <input
               type="tel"
               id="contactPhone"
               placeholder="Contact Phone"
-              required
               value={newStaff.contactPhone}
               onChange={handleChange}
-              className={formErrors.contactPhone ? 'input-error' : ''}
+              className={`form-input ${formErrors.contactPhone ? 'form-input-error' : ''}`}
             />
-            {formErrors.contactPhone && <p className="error-text">{formErrors.contactPhone}</p>}
-          </div>
-          <div className="form-group">
-            <label htmlFor="password">Password: {isEditing && <span className="text-gray-500">(Leave blank to keep current)</span>}</label>
-            <input
-              type="password"
-              id="password"
-              placeholder={isEditing ? "Leave blank" : "Password"}
-              required={!isEditing}
-              value={newStaff.password}
-              onChange={handleChange}
-              className={formErrors.password ? 'input-error' : ''}
-            />
-            {formErrors.password && <p className="error-text">{formErrors.password}</p>}
+            {formErrors.contactPhone && <p className="error-message">{formErrors.contactPhone}</p>}
           </div>
           {newStaff.role.includes('Teacher') && (
-            <Fragment>
-              <div className="form-group full-width">
-                <label htmlFor="assignedSubjects">Assigned Subjects (Ctrl+Click to select multiple):</label>
+            <>
+              <div className="form-group form-group-full">
+                <label htmlFor="assignedSubjects" className="form-label">Assigned Subjects (Ctrl+Click to select multiple):</label>
                 <select
                   id="assignedSubjects"
                   multiple
                   value={newStaff.assignedSubjects}
                   onChange={handleChange}
-                  className={formErrors.assignedSubjects ? 'input-error' : ''}
+                  className={`form-input multiselect ${formErrors.assignedSubjects ? 'form-input-error' : ''}`}
                 >
                   {uniqueSubjects.length > 0 ? (
                     uniqueSubjects.map(subjectCode => (
@@ -467,16 +482,16 @@ function StaffManagement() {
                     <option value="" disabled>No subjects available. Add subjects in Academic Management.</option>
                   )}
                 </select>
-                {formErrors.assignedSubjects && <p className="error-text">{formErrors.assignedSubjects}</p>}
+                {formErrors.assignedSubjects && <p className="error-message">{formErrors.assignedSubjects}</p>}
               </div>
-              <div className="form-group full-width">
-                <label htmlFor="assignedClasses">Assigned Classes (Ctrl+Click to select multiple):</label>
+              <div className="form-group form-group-full">
+                <label htmlFor="assignedClasses" className="form-label">Assigned Classes (Ctrl+Click to select multiple):</label>
                 <select
                   id="assignedClasses"
                   multiple
                   value={newStaff.assignedClasses}
                   onChange={handleChange}
-                  className={formErrors.assignedClasses ? 'input-error' : ''}
+                  className={`form-input multiselect ${formErrors.assignedClasses ? 'form-input-error' : ''}`}
                 >
                   {uniqueClasses.length > 0 ? (
                     uniqueClasses.map(className => (
@@ -486,25 +501,29 @@ function StaffManagement() {
                     <option value="" disabled>No classes available. Add students to create classes.</option>
                   )}
                 </select>
-                {formErrors.assignedClasses && <p className="error-text">{formErrors.assignedClasses}</p>}
+                {formErrors.assignedClasses && <p className="error-message">{formErrors.assignedClasses}</p>}
               </div>
-            </Fragment>
+            </>
           )}
-          <div className="form-group full-width">
-            <label htmlFor="resumeDocument">Resume/CV (PDF/Doc/Image):</label>
+          <div className="form-group form-group-full">
+            <label htmlFor="resumeDocument" className="form-label">Resume/CV (PDF/Doc/Image):</label>
             <input
               type="file"
               id="resumeDocument"
               onChange={handleChange}
               accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-              className={formErrors.resumeDocument ? 'input-error' : ''}
+              className={`form-input-file ${formErrors.resumeDocument ? 'form-input-error' : ''}`}
             />
-            {newStaff.resumeDocument && <p className="text-sm text-gray-500 mt-1">Selected: {newStaff.resumeDocument}</p>}
-            {formErrors.resumeDocument && <p className="error-text">{formErrors.resumeDocument}</p>}
+            {newStaff.resumeDocument && <p className="file-info">Selected: {newStaff.resumeDocument}</p>}
+            {formErrors.resumeDocument && <p className="error-message">{formErrors.resumeDocument}</p>}
           </div>
           <div className="form-actions">
-            <button type="submit">{submitButtonText}</button>
-            <button type="button" onClick={clearSearchAndForm} className="secondary-button">Clear Form</button>
+            <button type="submit" className="form-submit-btn">
+              {submitButtonText}
+            </button>
+            <button type="button" onClick={clearSearchAndForm} className="form-clear-btn">
+              Clear Form
+            </button>
           </div>
         </form>
       </div>
@@ -517,11 +536,14 @@ function StaffManagement() {
             placeholder="Search by Name, ID or Role"
             value={searchTerm}
             onChange={handleSearchChange}
+            className="filter-input"
           />
-          <button onClick={clearSearchAndForm} className="secondary-button">Clear Filter</button>
+          <button onClick={clearSearchAndForm} className="filter-clear-btn">
+            Clear Filter / Reset Form
+          </button>
         </div>
         <div className="table-container">
-            <table id="staffTable">
+            <table className="staff-table">
                 <thead>
                     <tr>
                         <th>Staff ID</th>
@@ -539,8 +561,8 @@ function StaffManagement() {
                 </thead>
                 <tbody>
                 {filteredStaffs.length > 0 ? (
-                    filteredStaffs.map(staff => (
-                    <tr key={staff._id}>
+                    filteredStaffs.map((staff, index) => (
+                    <tr key={staff._id} className={index % 2 === 0 ? 'even-row' : 'odd-row'}>
                         <td>{staff.staffId}</td>
                         <td>{staff.firstname} {staff.surname}</td>
                         <td>{staff.role}</td>
@@ -550,8 +572,8 @@ function StaffManagement() {
                         <td>{staff.qualifications}</td>
                         <td>{staff.assignedSubjects && staff.assignedSubjects.length > 0 ? staff.assignedSubjects.join(', ') : 'N/A'}</td>
                         <td>{staff.assignedClasses && staff.assignedClasses.length > 0 ? staff.assignedClasses.join(', ') : 'N/A'}</td>
-                        <td>{staff.resumeDocument ? <a href="#" onClick={(e) => { e.preventDefault(); alert(`Simulating download of: ${staff.resumeDocument}`); }}>{staff.resumeDocument}</a> : 'N/A'}</td>
-                        <td className="action-buttons">
+                        <td>{staff.resumeDocument ? <a href={`http://localhost:5000${staff.resumeDocument}`} target="_blank" rel="noopener noreferrer">{staff.resumeDocument.split('/').pop()}</a> : 'N/A'}</td>
+                        <td className="table-actions">
                         <button
                             className="action-btn edit-btn"
                             onClick={() => editStaff(staff.staffId)}>
@@ -567,19 +589,13 @@ function StaffManagement() {
                     ))
                 ) : (
                     <tr>
-                    <td colSpan="11">No staff found.</td>
+                    <td colSpan="11" className="no-data">No staff found.</td>
                     </tr>
                 )}
                 </tbody>
             </table>
         </div>
       </div>
-       <ConfirmModal
-        isOpen={isModalOpen}
-        message={`Are you sure you want to delete staff with ID: ${staffToDelete}?`}
-        onConfirm={confirmDelete}
-        onCancel={cancelDelete}
-      />
     </div>
   );
 }

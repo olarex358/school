@@ -1,9 +1,8 @@
 // src/pages/LoginPage.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-// The useLocalStorage hook is no longer needed for login logic itself, but we'll keep the import for now if other parts of the file use it.
-import useLocalStorage from '../hooks/useLocalStorage';
 import logo from './logo.png';
+import ConfirmModal from '../components/ConfirmModal'; // Assuming ConfirmModal is available
 
 function LoginPage() {
   const [username, setUsername] = useState('');
@@ -11,21 +10,25 @@ function LoginPage() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  // Load all relevant user data from localStorage using our custom hook
-  const [adminUsers] = useLocalStorage('schoolPortalUsers', []);
-  const [students] = useLocalStorage('schoolPortalStudents', []);
-  const [staffs] = useLocalStorage('schoolPortalStaff', []);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+  const [isModalAlert, setIsModalAlert] = useState(false);
 
   useEffect(() => {
     setError('');
   }, []);
+
+  const showAlert = (msg) => {
+    setModalMessage(msg);
+    setIsModalAlert(true);
+    setIsModalOpen(true);
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
 
     try {
-      // Send login data to our backend API
       const response = await fetch('http://localhost:5000/api/login', {
         method: 'POST',
         headers: {
@@ -36,15 +39,13 @@ function LoginPage() {
 
       if (response.ok) {
         const data = await response.json();
-        const user = data.user;
         
-        // Determine the user type from the backend response
-        let userType = user.type;
-
-        // Store user data in localStorage, just as a flag for the frontend
-        localStorage.setItem('loggedInUser', JSON.stringify({ ...user, type: userType }));
+        // Store JWT and user data in localStorage
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('loggedInUser', JSON.stringify(data.user));
         
-        // Redirect to the appropriate dashboard based on user type from backend
+        // Redirect to the appropriate dashboard
+        const userType = data.user.type;
         if (userType === 'admin') {
           navigate('/dashboard');
         } else if (userType === 'student') {
@@ -53,7 +54,6 @@ function LoginPage() {
           navigate('/staff-dashboard');
         }
       } else {
-        // Handle failed login
         const errorData = await response.json();
         setError(errorData.message || 'Login failed.');
       }
@@ -65,6 +65,13 @@ function LoginPage() {
 
   return (
     <div className="login-page">
+      <ConfirmModal
+        isOpen={isModalOpen}
+        message={modalMessage}
+        onConfirm={() => setIsModalOpen(false)}
+        onCancel={() => setIsModalOpen(false)}
+        isAlert={isModalAlert}
+      />
       <header>
         <img src={logo} alt="logo" width="150px" height="150px" />
       </header>

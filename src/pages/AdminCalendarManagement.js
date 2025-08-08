@@ -1,16 +1,17 @@
 // src/pages/AdminCalendarManagement.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import useLocalStorage from '../hooks/useLocalStorage';
+import { useData } from '../context/DataContext';
 import ConfirmModal from '../components/ConfirmModal';
- // New CSS file for styling
+import { db } from '../firebase/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+
 
 function AdminCalendarManagement() {
   const navigate = useNavigate();
   const [loggedInAdmin, setLoggedInAdmin] = useState(null);
 
-  // Update hook to get data from the backend
-  const [calendarEvents, setCalendarEvents, loadingEvents] = useLocalStorage('schoolPortalCalendarEvents', [], 'http://localhost:5000/api/schoolPortalCalendarEvents');
+  const { calendarEvents, setCalendarEvents, loading, error } = useData();
 
   const [eventForm, setEventForm] = useState({
     title: '',
@@ -19,21 +20,17 @@ function AdminCalendarManagement() {
     audience: 'all'
   });
   const [formErrors, setFormErrors] = useState({});
-  const [message, setMessage] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editEventId, setEditEventId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // State for table sorting
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'ascending' });
 
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
   const [modalAction, setModalAction] = useState(() => {});
   const [isModalAlert, setIsModalAlert] = useState(false);
 
-  // Helper functions for modal control
   const showConfirm = (msg, action) => {
     setModalMessage(msg);
     setModalAction(() => action);
@@ -71,12 +68,26 @@ function AdminCalendarManagement() {
     const { id, value } = e.target;
     setEventForm(prev => ({ ...prev, [id]: value }));
     setFormErrors(prev => ({ ...prev, [id]: '' }));
-    setMessage(null);
+  };
+
+  const addNotification = async (title, body, recipientType, recipientId = null) => {
+    try {
+      await addDoc(collection(db, 'notifications'), {
+        title,
+        body,
+        recipientType,
+        recipientId,
+        isRead: false,
+        timestamp: serverTimestamp()
+      });
+    } catch (error) {
+      console.error("Error adding notification:", error);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage(null);
+
     if (!validateForm()) {
       showAlert('Please correct the errors in the form.');
       return;
@@ -87,10 +98,13 @@ function AdminCalendarManagement() {
     };
     
     try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+
       if (isEditing) {
         const response = await fetch(`http://localhost:5000/api/schoolPortalCalendarEvents/${editEventId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(eventToAddOrUpdate),
         });
         if (response.ok) {
@@ -108,13 +122,18 @@ function AdminCalendarManagement() {
       } else {
         const response = await fetch('http://localhost:5000/api/schoolPortalCalendarEvents', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(eventToAddOrUpdate),
         });
         if (response.ok) {
           const newEvent = await response.json();
           setCalendarEvents(prevEvents => [...prevEvents, newEvent]);
           showAlert('Calendar event added successfully!');
+          addNotification(
+            `New Calendar Event: ${newEvent.title}`,
+            newEvent.description,
+            newEvent.audience
+          );
         } else {
           const errorData = await response.json();
           showAlert(errorData.message || 'Failed to add new calendar event.');
@@ -136,7 +155,6 @@ function AdminCalendarManagement() {
       setEventForm(event);
       setIsEditing(true);
       setEditEventId(idToEdit);
-      setMessage(null);
       setFormErrors({});
     }
   };
@@ -148,6 +166,7 @@ function AdminCalendarManagement() {
         try {
           const response = await fetch(`http://localhost:5000/api/schoolPortalCalendarEvents/${idToDelete}`, {
             method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
           });
           if (response.ok) {
             setCalendarEvents(prevEvents => prevEvents.filter(event => event._id !== idToDelete));
@@ -168,10 +187,8 @@ function AdminCalendarManagement() {
     setIsEditing(false);
     setEditEventId(null);
     setFormErrors({});
-    setMessage(null);
   };
   
-  // Sorting logic
   const sortTable = (key) => {
     let direction = 'ascending';
     if (sortConfig.key === key && sortConfig.direction === 'ascending') {
@@ -190,7 +207,6 @@ function AdminCalendarManagement() {
       let keyA = a[sortConfig.key];
       let keyB = b[sortConfig.key];
       
-      // Special handling for date sorting
       if (sortConfig.key === 'date') {
         keyA = new Date(keyA);
         keyB = new Date(keyB);
@@ -205,12 +221,12 @@ function AdminCalendarManagement() {
       return 0;
     });
 
-  if (!loggedInAdmin) {
+  if (!loggedInAdmin || loading) {
     return <div className="content-section">Access Denied. Please log in as an Admin.</div>;
   }
 
-  if (loadingEvents) {
-    return <div className="content-section">Loading calendar events...</div>;
+  if (error) {
+    return <div className="content-section">Error loading data: {error.message}</div>;
   }
 
   return (
@@ -225,11 +241,6 @@ function AdminCalendarManagement() {
       <h1>Calendar Management</h1>
       <div className="sub-section">
         <h2>{isEditing ? 'Edit Calendar Event' : 'Add New Calendar Event'}</h2>
-        {message && (
-          <div className={`form-message form-message-${message.type}`}>
-            {message.text}
-          </div>
-        )}
         <form onSubmit={handleSubmit} className="calendar-form">
           <div className="form-group">
             <label htmlFor="title" className="form-label">Event Title:</label>

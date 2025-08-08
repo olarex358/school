@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import useLocalStorage from '../hooks/useLocalStorage';
 import { useNavigate } from 'react-router-dom';
 import ConfirmModal from '../components/ConfirmModal';
+import { db } from '../firebase/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 
 function AdminMessaging() {
@@ -65,6 +67,8 @@ function AdminMessaging() {
       showAlert('Please correct the errors in the form.');
       return;
     }
+    
+    // First, save the message to MongoDB as before
     const newMessage = {
       sender: loggedInAdmin ? loggedInAdmin.username : 'Admin',
       subject: messageSubject,
@@ -86,6 +90,17 @@ function AdminMessaging() {
         const createdMessage = await response.json();
         setAdminMessages(prevMessages => [...prevMessages, createdMessage]);
         
+        // Now, add a notification to Firestore for real-time update
+        const notificationPayload = {
+          title: `New Admin Message: ${messageSubject}`,
+          body: messageBody,
+          recipientType: recipientType,
+          recipientId: selectedRecipientId || null,
+          isRead: false,
+          timestamp: serverTimestamp() // Use Firestore's server timestamp
+        };
+        await addDoc(collection(db, 'notifications'), notificationPayload);
+
         showAlert(`Message sent to ${recipientType.replace('individual', '').replace('all', '')} successfully!`);
       } else {
         const errorData = await response.json();
