@@ -1,14 +1,16 @@
 // src/pages/LoginPage.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/AuthContext'; // Import useAuth
 import logo from './logo.png';
-import ConfirmModal from '../components/ConfirmModal'; // Assuming ConfirmModal is available
+import ConfirmModal from '../components/ConfirmModal';
 
 function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { login } = useAuth(); // Get login function from AuthContext
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
@@ -40,9 +42,8 @@ function LoginPage() {
       if (response.ok) {
         const data = await response.json();
         
-        // Store JWT and user data in localStorage
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('loggedInUser', JSON.stringify(data.user));
+        // Use AuthContext login instead of localStorage directly
+        login(data.token); // This will handle token storage and user decoding
         
         // Redirect to the appropriate dashboard
         const userType = data.user.type;
@@ -105,5 +106,8 @@ function LoginPage() {
     </div>
   );
 }
+// In your browser console, check what's being sent
+console.log('Username:', document.getElementById('username').value);
+console.log('Password:', document.getElementById('password').value);
 
 export default LoginPage;

@@ -1,177 +1,214 @@
 // src/context/DataContext.js
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { getFirestore, collection, onSnapshot, query, where } from 'firebase/firestore'; // Import Firestore functions
-import { db } from '../firebase/firebase'; // Import the initialized Firestore instance
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import useApi from '../hooks/useApi';
+import { useAuth } from '../hooks/AuthContext';
 
 const DataContext = createContext();
 
 export const useData = () => {
-  return useContext(DataContext);
+    const context = useContext(DataContext);
+    if (!context) {
+        throw new Error('useData must be used within a DataProvider');
+    }
+    return context;
 };
 
 export const DataProvider = ({ children }) => {
-  const navigate = useNavigate();
-  const [loggedInUser, setLoggedInUser] = useState(null);
+    const { user, token } = useAuth();
 
-  const [data, setData] = useState({
-    students: [],
-    staffs: [],
-    subjects: [],
-    results: [],
-    pendingResults: [],
-    certificationResults: [],
-    feeRecords: [],
-    calendarEvents: [],
-    syllabusEntries: [],
-    digitalLibrary: [],
-    users: [],
-    adminMessages: [],
-    certificationRegistrations: [],
-    attendanceRecords: [],
-    timetables: [],
-    notifications: [] // Added for real-time notifications
-  });
+    // Create API hooks at the top level (not inside another function)
+    const studentsData = useApi(user ? `${process.env.REACT_APP_BACKEND_URL}/api/students` : null);
+    const staffsData = useApi(user ? `${process.env.REACT_APP_BACKEND_URL}/api/staffs` : null);
+    const subjectsData = useApi(user ? `${process.env.REACT_APP_BACKEND_URL}/api/subjects` : null);
+    const resultsData = useApi(user ? `${process.env.REACT_APP_BACKEND_URL}/api/results` : null);
+    const pendingResultsData = useApi(user ? `${process.env.REACT_APP_BACKEND_URL}/api/pendingResults` : null);
+    const certificationResultsData = useApi(user ? `${process.env.REACT_APP_BACKEND_URL}/api/certificationResults` : null);
+    const feeRecordsData = useApi(user ? `${process.env.REACT_APP_BACKEND_URL}/api/feeRecords` : null);
+    const calendarEventsData = useApi(user ? `${process.env.REACT_APP_BACKEND_URL}/api/calendarEvents` : null);
+    const syllabusEntriesData = useApi(user ? `${process.env.REACT_APP_BACKEND_URL}/api/syllabusEntries` : null);
+    const digitalLibraryData = useApi(user ? `${process.env.REACT_APP_BACKEND_URL}/api/digitalLibrary` : null);
+    const usersData = useApi(user ? `${process.env.REACT_APP_BACKEND_URL}/api/users` : null);
+    const adminMessagesData = useApi(user ? `${process.env.REACT_APP_BACKEND_URL}/api/adminMessages` : null);
+    const certificationRegistrationsData = useApi(user ? `${process.env.REACT_APP_BACKEND_URL}/api/certificationRegistrations` : null);
+    const attendanceRecordsData = useApi(user ? `${process.env.REACT_APP_BACKEND_URL}/api/attendance` : null);
+    const timetablesData = useApi(user ? `${process.env.REACT_APP_BACKEND_URL}/api/timetables` : null);
+    const notificationsData = useApi(user ? `${process.env.REACT_APP_BACKEND_URL}/api/notifications` : null);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [dbFetchCompleted, setDbFetchCompleted] = useState(false);
+    // Combine all data into a single state object
+    const [data, setData] = useState({
+        students: [],
+        staffs: [],
+        subjects: [],
+        results: [],
+        pendingResults: [],
+        certificationResults: [],
+        feeRecords: [],
+        calendarEvents: [],
+        syllabusEntries: [],
+        digitalLibrary: [],
+        users: [],
+        adminMessages: [],
+        certificationRegistrations: [],
+        attendanceRecords: [],
+        timetables: [],
+        notifications: []
+    });
 
-  // Effect to check for logged in user
-  useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('loggedInUser'));
-    setLoggedInUser(user);
-  }, []);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-  // Effect to fetch initial data from MongoDB backend
-  useEffect(() => {
-    if (!loggedInUser) {
-      setLoading(false);
-      return;
-    }
+    // Memoized setter functions
+    const createSetter = useCallback((key) => (newData) => {
+        setData(prev => ({ ...prev, [key]: newData }));
+    }, []);
 
-    const fetchAllData = async () => {
-      setLoading(true);
-      setError(null);
-      const token = localStorage.getItem('token');
-      
-      const headers = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      };
+    // Effect to update the combined data state only when user is authenticated
+    useEffect(() => {
+        // If no user is authenticated, set empty data
+        if (!user) {
+            setData({
+                students: [],
+                staffs: [],
+                subjects: [],
+                results: [],
+                pendingResults: [],
+                certificationResults: [],
+                feeRecords: [],
+                calendarEvents: [],
+                syllabusEntries: [],
+                digitalLibrary: [],
+                users: [],
+                adminMessages: [],
+                certificationRegistrations: [],
+                attendanceRecords: [],
+                timetables: [],
+                notifications: []
+            });
+            setLoading(false);
+            setError('User not authenticated');
+            return;
+        }
 
-      const endpoints = [
-        'schoolPortalStudents',
-        'schoolPortalStaff',
-        'schoolPortalSubjects',
-        'schoolPortalResults',
-        'schoolPortalPendingResults',
-        'schoolPortalCertificationResults',
-        'schoolPortalFeeRecords',
-        'schoolPortalCalendarEvents',
-        'schoolPortalSyllabusEntries',
-        'schoolPortalDigitalLibrary',
-        'schoolPortalUsers',
-        'schoolPortalAdminMessages',
-        'schoolPortalCertificationRegistrations',
-        'schoolPortalAttendance',
-        'schoolPortalTimetables'
-      ];
+        // Check if any API is still loading
+        const allDataHooks = [
+            studentsData, staffsData, subjectsData, resultsData, pendingResultsData,
+            certificationResultsData, feeRecordsData, calendarEventsData,
+            syllabusEntriesData, digitalLibraryData, usersData, adminMessagesData,
+            certificationRegistrationsData, attendanceRecordsData, timetablesData,
+            notificationsData
+        ];
 
-      const fetchPromises = endpoints.map(endpoint =>
-        fetch(`http://localhost:5000/api/${endpoint}`, { headers })
-          .then(res => {
-            if (res.status === 403 || res.status === 401) {
-              localStorage.removeItem('token');
-              localStorage.removeItem('loggedInUser');
-              navigate('/login');
-              return [];
-            }
-            return res.json();
-          })
-          .catch(err => {
-            console.error(`Failed to fetch ${endpoint}:`, err);
-            return [];
-          })
-      );
+        const allLoading = allDataHooks.some(dataHook => dataHook.loading);
+        const anyError = allDataHooks.find(dataHook => dataHook.error);
 
-      try {
-        const results = await Promise.all(fetchPromises);
-        const newData = {};
-        endpoints.forEach((endpoint, index) => {
-          const key = endpoint.replace('schoolPortal', '').replace(/^\w/, c => c.toLowerCase());
-          newData[key] = results[index];
-        });
-        setData(newData);
-        setDbFetchCompleted(true);
-      } catch (err) {
-        setError(err);
-      } finally {
-        setLoading(false);
-      }
+        setLoading(allLoading);
+        setError(anyError ? anyError.message : null);
+
+        // Only update data if we have an authenticated user
+        if (user && token) {
+            setData(prev => {
+                const newData = {
+                    students: studentsData.data || [],
+                    staffs: staffsData.data || [],
+                    subjects: subjectsData.data || [],
+                    results: resultsData.data || [],
+                    pendingResults: pendingResultsData.data || [],
+                    certificationResults: certificationResultsData.data || [],
+                    feeRecords: feeRecordsData.data || [],
+                    calendarEvents: calendarEventsData.data || [],
+                    syllabusEntries: syllabusEntriesData.data || [],
+                    digitalLibrary: digitalLibraryData.data || [],
+                    users: usersData.data || [],
+                    adminMessages: adminMessagesData.data || [],
+                    certificationRegistrations: certificationRegistrationsData.data || [],
+                    attendanceRecords: attendanceRecordsData.data || [],
+                    timetables: timetablesData.data || [],
+                    notifications: notificationsData.data || []
+                };
+
+                // Only update if data actually changed
+                return JSON.stringify(prev) === JSON.stringify(newData) ? prev : newData;
+            });
+        }
+    }, [
+        user,
+        token,
+        studentsData.data, studentsData.loading, studentsData.error,
+        staffsData.data, staffsData.loading, staffsData.error,
+        subjectsData.data, subjectsData.loading, subjectsData.error,
+        resultsData.data, resultsData.loading, resultsData.error,
+        pendingResultsData.data, pendingResultsData.loading, pendingResultsData.error,
+        certificationResultsData.data, certificationResultsData.loading, certificationResultsData.error,
+        feeRecordsData.data, feeRecordsData.loading, feeRecordsData.error,
+        calendarEventsData.data, calendarEventsData.loading, calendarEventsData.error,
+        syllabusEntriesData.data, syllabusEntriesData.loading, syllabusEntriesData.error,
+        digitalLibraryData.data, digitalLibraryData.loading, digitalLibraryData.error,
+        usersData.data, usersData.loading, usersData.error,
+        adminMessagesData.data, adminMessagesData.loading, adminMessagesData.error,
+        certificationRegistrationsData.data, certificationRegistrationsData.loading, certificationRegistrationsData.error,
+        attendanceRecordsData.data, attendanceRecordsData.loading, attendanceRecordsData.error,
+        timetablesData.data, timetablesData.loading, timetablesData.error,
+        notificationsData.data, notificationsData.loading, notificationsData.error
+    ]);
+
+    // Function to refetch all data
+    const refetchAll = useCallback(() => {
+        if (!user) return;
+
+        // Call refetch on each data hook if available
+        if (studentsData.refetch) studentsData.refetch();
+        if (staffsData.refetch) staffsData.refetch();
+        if (subjectsData.refetch) subjectsData.refetch();
+        if (resultsData.refetch) resultsData.refetch();
+        if (pendingResultsData.refetch) pendingResultsData.refetch();
+        if (certificationResultsData.refetch) certificationResultsData.refetch();
+        if (feeRecordsData.refetch) feeRecordsData.refetch();
+        if (calendarEventsData.refetch) calendarEventsData.refetch();
+        if (syllabusEntriesData.refetch) syllabusEntriesData.refetch();
+        if (digitalLibraryData.refetch) digitalLibraryData.refetch();
+        if (usersData.refetch) usersData.refetch();
+        if (adminMessagesData.refetch) adminMessagesData.refetch();
+        if (certificationRegistrationsData.refetch) certificationRegistrationsData.refetch();
+        if (attendanceRecordsData.refetch) attendanceRecordsData.refetch();
+        if (timetablesData.refetch) timetablesData.refetch();
+        if (notificationsData.refetch) notificationsData.refetch();
+    }, [user, 
+        studentsData.refetch, staffsData.refetch, subjectsData.refetch,
+        resultsData.refetch, pendingResultsData.refetch, certificationResultsData.refetch,
+        feeRecordsData.refetch, calendarEventsData.refetch, syllabusEntriesData.refetch,
+        digitalLibraryData.refetch, usersData.refetch, adminMessagesData.refetch,
+        certificationRegistrationsData.refetch, attendanceRecordsData.refetch,
+        timetablesData.refetch, notificationsData.refetch
+    ]);
+
+    // Provide the combined data and loading state through the context
+    const value = {
+        ...data,
+        loading,
+        error,
+        refetchAll,
+        // Include setter functions for updating data
+        setStudents: createSetter('students'),
+        setStaffs: createSetter('staffs'),
+        setSubjects: createSetter('subjects'),
+        setResults: createSetter('results'),
+        setPendingResults: createSetter('pendingResults'),
+        setCertificationResults: createSetter('certificationResults'),
+        setFeeRecords: createSetter('feeRecords'),
+        setCalendarEvents: createSetter('calendarEvents'),
+        setSyllabusEntries: createSetter('syllabusEntries'),
+        setDigitalLibrary: createSetter('digitalLibrary'),
+        setUsers: createSetter('users'),
+        setAdminMessages: createSetter('adminMessages'),
+        setCertificationRegistrations: createSetter('certificationRegistrations'),
+        setAttendanceRecords: createSetter('attendanceRecords'),
+        setTimetables: createSetter('timetables'),
+        setNotifications: createSetter('notifications')
     };
-    fetchAllData();
-  }, [loggedInUser, navigate]);
-  
-  // New Effect for Real-time Firestore Notifications
-  useEffect(() => {
-    if (!loggedInUser) {
-      setData(prev => ({ ...prev, notifications: [] }));
-      return;
-    }
 
-    const notificationsCollection = collection(db, 'notifications');
-    let q;
-
-    if (loggedInUser.type === 'admin') {
-      q = query(notificationsCollection, where('recipientType', 'in', ['admin']));
-    } else if (loggedInUser.type === 'student') {
-      q = query(notificationsCollection, where('recipientType', 'in', ['allStudents', 'individualStudent']), where('recipientId', 'in', [loggedInUser.admissionNo, null]));
-    } else if (loggedInUser.type === 'staff') {
-      q = query(notificationsCollection, where('recipientType', 'in', ['allStaff', 'individualStaff']), where('recipientId', 'in', [loggedInUser.staffId, null]));
-    }
-    
-    // Subscribe to the query
-    if (q) {
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const newNotifications = snapshot.docs.map(doc => ({
-          ...doc.data(),
-          id: doc.id
-        })).sort((a, b) => b.timestamp.toMillis() - a.timestamp.toMillis());
-
-        setData(prev => ({ ...prev, notifications: newNotifications }));
-      }, (err) => {
-        console.error("Firestore subscription failed:", err);
-      });
-      return () => unsubscribe();
-    }
-  }, [loggedInUser]);
-
-  const value = {
-    ...data,
-    loading,
-    error,
-    // Functions to update state directly in the context
-    setStudents: (newStudents) => setData(prev => ({ ...prev, students: newStudents })),
-    setStaffs: (newStaffs) => setData(prev => ({ ...prev, staffs: newStaffs })),
-    setSubjects: (newSubjects) => setData(prev => ({ ...prev, subjects: newSubjects })),
-    setResults: (newResults) => setData(prev => ({ ...prev, results: newResults })),
-    setPendingResults: (newPending) => setData(prev => ({ ...prev, pendingResults: newPending })),
-    setCertificationResults: (newCert) => setData(prev => ({ ...prev, certificationResults: newCert })),
-    setFeeRecords: (newFees) => setData(prev => ({ ...prev, feeRecords: newFees })),
-    setCalendarEvents: (newEvents) => setData(prev => ({ ...prev, calendarEvents: newEvents })),
-    setSyllabusEntries: (newSyllabus) => setData(prev => ({ ...prev, syllabusEntries: newSyllabus })),
-    setDigitalLibrary: (newLibrary) => setData(prev => ({ ...prev, digitalLibrary: newLibrary })),
-    setUsers: (newUsers) => setData(prev => ({ ...prev, users: newUsers })),
-    setAdminMessages: (newMessages) => setData(prev => ({ ...prev, adminMessages: newMessages })),
-    setCertificationRegistrations: (newRegs) => setData(prev => ({ ...prev, certificationRegistrations: newRegs })),
-    setAttendanceRecords: (newAttendance) => setData(prev => ({ ...prev, attendanceRecords: newAttendance })),
-    setTimetables: (newTimetables) => setData(prev => ({ ...prev, timetables: newTimetables })),
-  };
-
-  return (
-    <DataContext.Provider value={value}>
-      {children}
-    </DataContext.Provider>
-  );
+    return (
+        <DataContext.Provider value={value}>
+            {children}
+        </DataContext.Provider>
+    );
 };

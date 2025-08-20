@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useLocalStorage from '../hooks/useLocalStorage';
 import ConfirmModal from '../components/ConfirmModal';
+import { useData } from '../context/DataContext';
 
 
 function AdminCertificationManagement() {
@@ -10,10 +11,7 @@ function AdminCertificationManagement() {
   const [loggedInAdmin, setLoggedInAdmin] = useState(null);
 
   // Data from localStorage
-  const [certificationResults, setCertificationResults] = useLocalStorage('schoolPortalCertificationResults', [], 'http://localhost:5000/api/schoolPortalCertificationResults');
-  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
-  const [subjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
-
+  const { certificationResults, students, subjects, loading, error, setCertificationResults, setStudents, setSubjects } = useData();
   // Form states
   const [resultForm, setResultForm] = useState({
     studentAdmissionNo: '',

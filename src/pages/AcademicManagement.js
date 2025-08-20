@@ -3,15 +3,15 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useLocalStorage from '../hooks/useLocalStorage';
 import ConfirmModal from '../components/ConfirmModal';
-
+import { useData } from '../context/DataContext';
 
 function AcademicManagement() {
   const navigate = useNavigate();
   const [loggedInAdmin, setLoggedInAdmin] = useState(null);
 
   // Update hook to get data from the backend
-  const [subjects, setSubjects, loadingSubjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
-
+  const { subjects, loading, error, setSubjects } = useData();
+const loadingSubjects = loading; // Map the centralized loading state to the local variable
   const [newSubject, setNewSubject] = useState({
     subjectName: '',
     subjectCode: ''

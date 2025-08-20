@@ -1,10 +1,10 @@
 // src/App.js
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import './App.css';
-// Import Header and Footer - these will now be general for all pages
 import Header from './components/Header';
 import Footer from './components/Footer';
+import { useAuth } from './hooks/AuthContext';
 
 // Import all your page components with correct paths
 import LoginPage from './pages/LoginPage';
@@ -45,7 +45,7 @@ import AdminFeesManagement from './pages/AdminFeesManagement';
 // Import Admin Calendar and Syllabus Management
 import AdminCalendarManagement from './pages/AdminCalendarManagement';
 import AdminSyllabusManagement from './pages/AdminSyllabusManagement';
-import MarkAttendance from './pages/MarkAttendance'
+import MarkAttendance from './pages/MarkAttendance';
 import AdminResultsApproval from './pages/AdminResultsApproval';
 import AdminTimetableManagement from './pages/AdminTimetableManagement';
 import StudentTimetable from './pages/StudentTimetable';
@@ -55,22 +55,22 @@ import UserDigitalLibrary from './pages/UserDigitalLibrary';
 import AdminCertificationManagement from './pages/AdminCertificationManagement';
 import StudentCertificationRegistration from './pages/StudentCertificationRegistration';
 
-import { hasPermission } from './permissions'; // Import the new permission checker
+import { hasPermission } from './permissions';
 
 const ProtectedRoute = ({ children }) => {
   const location = useLocation();
-  const loggedInUser = JSON.parse(localStorage.getItem('loggedInUser'));
+  const { user } = useAuth();
   
   // Determine the user's role. Use 'guest' if not logged in.
-  const userRole = loggedInUser ? loggedInUser.type : 'guest';
+  const userRole = user ? user.type : 'guest';
   
   // Check if the user has permission to access the current route
   if (!hasPermission(userRole, location.pathname)) {
     // Redirect logic for unauthorized users
-    if (loggedInUser) {
-      if (loggedInUser.type === 'admin') return <Navigate to="/dashboard" replace />;
-      if (loggedInUser.type === 'student') return <Navigate to="/student-dashboard" replace />;
-      if (loggedInUser.type === 'staff') return <Navigate to="/staff-dashboard" replace />;
+    if (user) {
+      if (user.type === 'admin') return <Navigate to="/dashboard" replace />;
+      if (user.type === 'student') return <Navigate to="/student-dashboard" replace />;
+      if (user.type === 'staff') return <Navigate to="/staff-dashboard" replace />;
     }
     return <Navigate to="/login" replace />;
   }
@@ -78,26 +78,8 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
-
 function App() {
-  const [loggedInUser, setLoggedInUser] = useState(() => {
-    try {
-      const user = localStorage.getItem('loggedInUser');
-      return user ? JSON.parse(user) : null;
-    } catch (error) {
-      console.error("Failed to parse loggedInUser from localStorage:", error);
-      return null;
-    }
-  });
-
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const user = localStorage.getItem('loggedInUser');
-      setLoggedInUser(user ? JSON.parse(user) : null);
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+  const { user } = useAuth();
 
   return (
     <div className="App">
@@ -141,13 +123,13 @@ function App() {
           <Route path='/student-digital-library' element={<ProtectedRoute><UserDigitalLibrary /></ProtectedRoute>} />
           <Route path='/student-certification-registration' element={<ProtectedRoute><StudentCertificationRegistration /></ProtectedRoute>} />
 
-          <Route path="/staff-dashboard" element={<ProtectedRoute><StaffDashboard/></ProtectedRoute>} />
+          <Route path="/staff-dashboard" element={<ProtectedRoute><StaffDashboard /></ProtectedRoute>} />
           <Route path="/staff-profile" element={<ProtectedRoute><StaffProfile /></ProtectedRoute>} />
           <Route path="/staff-subjects" element={<ProtectedRoute><StaffSubjects /></ProtectedRoute>} />
           <Route path="/staff-calendar" element={<ProtectedRoute><StaffCalendar /></ProtectedRoute>} />
           <Route path="/staff-mails" element={<ProtectedRoute><StaffMails /></ProtectedRoute>} />
           <Route path="/staff-password-change" element={<ProtectedRoute><StaffPasswordChange /></ProtectedRoute>} />
-          <Route path="/mark-attendance" element={<ProtectedRoute><MarkAttendance/></ProtectedRoute>} />
+          <Route path="/mark-attendance" element={<ProtectedRoute><MarkAttendance /></ProtectedRoute>} />
           <Route path="/staff-timetable" element={<ProtectedRoute><StaffTimetable /></ProtectedRoute>} />
           <Route path="/staff-digital-library" element={<ProtectedRoute><UserDigitalLibrary /></ProtectedRoute>} />
           

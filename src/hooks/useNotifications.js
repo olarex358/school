@@ -1,67 +1,77 @@
 // src/hooks/useNotifications.js
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useData } from '../context/DataContext';
-import { db } from '../firebase/firebase';
-import { collection, writeBatch, deleteDoc, doc, query, where, getDocs } from 'firebase/firestore';
+import { useAuth } from '../hooks/AuthContext'; 
 
 function useNotifications() {
-  // We now get notifications from our centralized context, which is listening to Firestore
-  const { notifications } = useData();
+  const { notifications, setNotifications } = useData();
+  const { user, token } = useAuth(); // Use user from AuthContext instead of localStorage
   const [unreadCount, setUnreadCount] = useState(0);
 
+  // Calculate unread count without causing re-render loops
   useEffect(() => {
     if (notifications) {
-      setUnreadCount(notifications.filter(n => !n.isRead).length);
+      const count = notifications.filter(n => !n.isRead).length;
+      setUnreadCount(count);
     }
   }, [notifications]);
 
   /**
-   * Marks all notifications for the current user as read in Firestore.
+   * Marks all notifications for the current user as read via the backend.
    */
-  const markAllAsRead = async () => {
+  const markAllAsRead = useCallback(async () => {
     try {
-      const loggedInUser = JSON.parse(localStorage.getItem('loggedInUser'));
-      const batch = writeBatch(db);
-      
-      const q = query(
-        collection(db, 'notifications'), 
-        where('recipientType', 'in', ['allStudents', `individual${loggedInUser.type.charAt(0).toUpperCase() + loggedInUser.type.slice(1)}`]),
-        where('recipientId', 'in', [loggedInUser.admissionNo || loggedInUser.staffId || loggedInUser.username, null]),
-        where('isRead', '==', false)
-      );
+      if (!user || !token) return;
 
-      const querySnapshot = await getDocs(q);
-      querySnapshot.forEach((document) => {
-        batch.update(document.ref, { isRead: true });
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/notifications/mark-read`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ userId: user.username, userType: user.type })
       });
-      await batch.commit();
+
+      if (!response.ok) {
+        throw new Error('Failed to mark notifications as read.');
+      }
+
+      // Optimistically update the UI
+      const updatedNotifications = notifications.map(n => ({ ...n, isRead: true }));
+      setNotifications(updatedNotifications);
+
     } catch (error) {
       console.error("Error marking notifications as read:", error);
     }
-  };
+  }, [user, token, notifications, setNotifications]); // Add all dependencies
 
   /**
-   * Clears all notifications for the current user from Firestore.
+   * Clears all notifications for the current user via the backend.
    */
-  const clearNotifications = async () => {
+  const clearNotifications = useCallback(async () => {
     try {
-      const loggedInUser = JSON.parse(localStorage.getItem('loggedInUser'));
-      const q = query(
-        collection(db, 'notifications'), 
-        where('recipientType', 'in', ['allStudents', `individual${loggedInUser.type.charAt(0).toUpperCase() + loggedInUser.type.slice(1)}`]),
-        where('recipientId', 'in', [loggedInUser.admissionNo || loggedInUser.staffId || loggedInUser.username, null])
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const batch = writeBatch(db);
-      querySnapshot.forEach((document) => {
-        batch.delete(document.ref);
+      if (!user || !token) return;
+
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/notifications/clear`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ userId: user.username, userType: user.type })
       });
-      await batch.commit();
+
+      if (!response.ok) {
+        throw new Error('Failed to clear notifications.');
+      }
+
+      // Optimistically update the UI
+      setNotifications([]);
+      
     } catch (error) {
       console.error("Error clearing notifications:", error);
     }
-  };
+  }, [user, token, setNotifications]); // Add all dependencies
 
   return {
     notifications,
