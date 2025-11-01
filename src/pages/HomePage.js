@@ -1,15 +1,25 @@
 // src/pages/HomePage.js
 import React, { useState, useEffect } from 'react';
+// Import the new secureFetch function (This is required for token management)
+import { secureFetch } from '../api/fetchHelper'; 
 
 function HomePage() {
   const [message, setMessage] = useState('');
   
   useEffect(() => {
-    // Make a GET request to our backend API
-    fetch('http://localhost:5000/api/hello')
-      .then(response => response.json())
-      .then(data => setMessage(data.message))
-      .catch(error => console.error('Failed to fetch from backend:', error));
+    // 💡 FIX: Using secureFetch to automatically handle token inclusion.
+    // This helper also contains the logic to clear the bad token from Local Storage 
+    // when it receives an authentication error, solving the recurring 500 error.
+    secureFetch('/api/hello') 
+      .then(data => {
+          // Success: Set the message from the backend
+          setMessage(data.message)
+      })
+      .catch(error => {
+          // Failure: Log the error and set a user-friendly message
+          console.error('Failed to fetch from backend:', error.message);
+          setMessage('Welcome! Please log in to explore our academic activities.');
+      });
   }, []);
 
   return (

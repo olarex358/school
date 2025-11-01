@@ -1,7 +1,6 @@
 // src/pages/LoginPage.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-// The useLocalStorage hook is no longer needed for login logic itself, but we'll keep the import for now if other parts of the file use it.
 import useLocalStorage from '../hooks/useLocalStorage';
 import logo from './logo.png';
 
@@ -41,12 +40,18 @@ function LoginPage() {
         // Determine the user type from the backend response
         let userType = user.type;
 
-        // Store user data in localStorage, just as a flag for the frontend
+        // ⭐️⭐️ THE FIX: Check for and store the token ⭐️⭐️
+        if (data.token && userType === 'admin') {
+            // StudentManagement looks for 'adminToken', and the backend provides 'data.token'
+            localStorage.setItem('adminToken', data.token); 
+        }
+
+        // Store user data in localStorage
         localStorage.setItem('loggedInUser', JSON.stringify({ ...user, type: userType }));
         
         // Redirect to the appropriate dashboard based on user type from backend
         if (userType === 'admin') {
-          navigate('/dashboard');
+          navigate('/dashboard'); 
         } else if (userType === 'student') {
           navigate('/student-dashboard');
         } else if (userType === 'staff') {

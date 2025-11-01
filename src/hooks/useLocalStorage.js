@@ -1,66 +1,45 @@
 // src/hooks/useLocalStorage.js
 import { useState, useEffect } from 'react';
 
-function useLocalStorage(key, initialValue, backendUrl) {
+/**
+ * Custom hook for managing state that persists in localStorage.
+ * Designed ONLY for local state persistence.
+ * @param {string} key The key under which the data is stored in localStorage.
+ * @param {any} initialValue The default value if nothing is found in localStorage.
+ * @returns {[any, Function, boolean]} [storedValue, setStoredValue, isLoading]
+ */
+function useLocalStorage(key, initialValue) {
+  // Use a state variable to track if the initial load from localStorage is complete
+  const [isLoading, setIsLoading] = useState(true);
+
+  // State to store our value, initialized from localStorage or initialValue
   const [storedValue, setStoredValue] = useState(() => {
     try {
+      // Get from local storage by key
       const item = window.localStorage.getItem(key);
+      // Parse stored json or return initialValue
       return item && item !== 'undefined' ? JSON.parse(item) : initialValue;
     } catch (error) {
-      console.error(`Error reading localStorage key "${key}":`, error);
+      // If error, return initialValue
+      console.error(`Error reading localStorage key “${key}”:`, error);
       return initialValue;
     }
   });
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
+  // Effect to handle writing the storedValue back to localStorage whenever it changes.
   useEffect(() => {
-    if (backendUrl) {
-      setLoading(true);
-      setError(null);
-
-      const fetchData = async () => {
-        try {
-          const response = await fetch(backendUrl);
-          if (!response.ok) {
-            throw new Error(`Failed to fetch from backend: ${response.statusText}`);
-          }
-          const data = await response.json();
-          setStoredValue(data);
-          window.localStorage.setItem(key, JSON.stringify(data));
-          setLoading(false);
-        } catch (err) {
-          console.warn(`Backend fetch failed for key "${key}". Falling back to localStorage.`, err);
-          setError(err);
-          setLoading(false);
-        }
-      };
-
-      fetchData();
-    }
-  }, [key, backendUrl]);
-
-  useEffect(() => {
-    if (!backendUrl) {
-      try {
-        window.localStorage.setItem(key, JSON.stringify(storedValue));
-      } catch (error) {
-        console.error(`Error writing to localStorage key "${key}":`, error);
-      }
-    }
-  }, [key, storedValue, backendUrl]);
-  
-  const setLocalValue = (value) => {
     try {
-      setStoredValue(value);
-      window.localStorage.setItem(key, JSON.stringify(value));
+      window.localStorage.setItem(key, JSON.stringify(storedValue));
+      // Set loading to false once the state has been initialized from localStorage
+      // and written back.
+      setIsLoading(false); 
     } catch (error) {
-      console.error(`Error setting localStorage key "${key}":`, error);
+      console.error(`Error writing to localStorage key “${key}”:`, error);
     }
-  };
+  }, [key, storedValue]);
 
-  return [storedValue, setLocalValue, loading, error];
+  // We return the state, the setter, and the local storage loading status
+  return [storedValue, setStoredValue, isLoading];
 }
 
 export default useLocalStorage;

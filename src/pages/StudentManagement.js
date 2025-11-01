@@ -8,8 +8,11 @@ function StudentManagement() {
   const navigate = useNavigate();
   const [loggedInAdmin, setLoggedInAdmin] = useState(null);
 
-  // Data from the backend via a custom hook
-  const [students, setStudents, loadingStudents] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
+  // 1. UPDATED: useLocalStorage now only handles local state persistence.
+  const [students, setStudents] = useLocalStorage('schoolPortalStudents', []);
+  // NEW: State for API loading and fetching errors.
+  const [loadingStudents, setLoadingStudents] = useState(true);
+  const [fetchError, setFetchError] = useState(null); 
   
   const initialStudentState = {
     firstName: '',
@@ -36,8 +39,56 @@ function StudentManagement() {
   const [message, setMessage] = useState(null);
   const [isNewStudentMode, setIsNewStudentMode] = useState(true);
   const [classFilter, setClassFilter] = useState('all');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [studentToDelete, setStudentToDelete] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false); // Used for Deletion
+  const [studentToDelete, setStudentToDelete] = useState(null); // Used for Deletion
+  
+  // ⭐️ NEW: State for Registration Success Modal
+  const [isRegSuccessModalOpen, setIsRegSuccessModalOpen] = useState(false);
+  const [newlyRegisteredStudent, setNewlyRegisteredStudent] = useState(null);
+
+  // 2. NEW EFFECT: Securely fetch initial student data on component mount
+  useEffect(() => {
+    const fetchStudents = async () => {
+        setLoadingStudents(true);
+        setFetchError(null);
+        
+        const adminToken = localStorage.getItem('adminToken'); // Get the token
+        
+        if (!adminToken) {
+            // If no token, show an error and stop loading
+            setFetchError('No Admin Token found. Please log in.');
+            setLoadingStudents(false);
+            // navigate('/login'); // Optional: redirect to login
+            return;
+        }
+        
+        try {
+            const response = await fetch('http://localhost:5000/api/schoolPortalStudents', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${adminToken}`, // THE FIX: Add the Authorization header
+                },
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || `Failed to fetch student data (Status: ${response.status}).`);
+            }
+
+            const data = await response.json();
+            setStudents(data); // This updates local storage via the hook
+            
+        } catch (err) {
+            setFetchError(err.message || 'An unexpected error occurred during fetch.');
+            console.error('Fetch error:', err);
+        } finally {
+            setLoadingStudents(false);
+        }
+    };
+    
+    fetchStudents();
+  }, [setStudents, navigate]);
 
   const validateField = (name, value) => {
     let error = '';
@@ -97,6 +148,8 @@ function StudentManagement() {
   const handleStudentModeChange = (e) => {
     const isNew = e.target.value === 'new';
     setIsNewStudentMode(isNew);
+    // Clear admissionNo state when switching to New Student mode, 
+    // so the auto-generated number can be displayed as a placeholder.
     setNewStudent(prevStudent => ({
       ...prevStudent,
       admissionNo: isNew ? '' : prevStudent.admissionNo
@@ -108,7 +161,7 @@ function StudentManagement() {
   const generateAdmissionNumber = () => {
     const currentYear = new Date().getFullYear();
     const maxCounter = students.length > 0
-      ? Math.max(...students.map(s => parseInt(s.admissionNo.split('/').pop())))
+      ? Math.max(...students.map(s => parseInt(s.admissionNo.split('/').pop() || 0)))
       : 0;
     const nextCounter = maxCounter + 1;
     return `BAC/STD/${currentYear}/${String(nextCounter).padStart(4, '0')}`;
@@ -119,6 +172,7 @@ function StudentManagement() {
     setMessage(null);
     let errors = {};
     Object.keys(newStudent).forEach(key => {
+      // Skip validation for admissionNo in New Student mode, as it's auto-generated
       if (key === 'admissionNo' && isNewStudentMode) return;
       if (key === 'password' && isEditing) return;
       const error = validateField(key, newStudent[key]);
@@ -135,10 +189,24 @@ function StudentManagement() {
       return;
     }
     
+    const adminToken = localStorage.getItem('adminToken');
+    if (!adminToken) {
+        setMessage({ type: 'error', text: 'Admin token missing. Please log in to perform this action.' });
+        return;
+    }
+    
+    const secureHeaders = { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken}`, 
+    };
+
     let finalAdmissionNo = newStudent.admissionNo;
-    if (!isEditing) {
+    // ⭐️ FIX 1: The auto-generation logic must ONLY run if it's a NEW registration AND we are in NEW STUDENT mode.
+    if (!isEditing && isNewStudentMode) {
       finalAdmissionNo = generateAdmissionNumber();
     }
+    // For Old Student mode (!isNewStudentMode), finalAdmissionNo already holds the manually input value from state.
+    
     const studentToSave = { 
       ...newStudent, 
       admissionNo: finalAdmissionNo, 
@@ -150,7 +218,7 @@ function StudentManagement() {
       if (isEditing) {
         const response = await fetch(`http://localhost:5000/api/schoolPortalStudents/${editStudentId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: secureHeaders,
           body: JSON.stringify(studentToSave),
         });
         if (response.ok) {
@@ -168,13 +236,15 @@ function StudentManagement() {
       } else {
         const response = await fetch('http://localhost:5000/api/schoolPortalStudents', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: secureHeaders,
           body: JSON.stringify(studentToSave),
         });
         if (response.ok) {
           const newStudentEntry = await response.json();
           setStudents(prevStudents => [...prevStudents, newStudentEntry]);
-          setMessage({ type: 'success', text: 'New student registered successfully!' });
+          
+          setNewlyRegisteredStudent(newStudentEntry);
+          setIsRegSuccessModalOpen(true);
         } else {
           const errorData = await response.json();
           setMessage({ type: 'error', text: errorData.message || 'Failed to add new student.' });
@@ -184,6 +254,7 @@ function StudentManagement() {
       setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
     }
     
+    // Clear form and reset state for new registration
     setNewStudent(initialStudentState);
     setSubmitButtonText('Register Student');
     setIsEditing(false);
@@ -197,7 +268,7 @@ function StudentManagement() {
       setNewStudent({ ...studentToEdit, password: '' });
       setSubmitButtonText('Update Student');
       setIsEditing(true);
-      setIsNewStudentMode(false);
+      setIsNewStudentMode(false); // When editing, we treat it like an 'Old Student'
       setEditStudentId(studentToEdit._id);
       setFormErrors({});
       setMessage(null);
@@ -216,9 +287,19 @@ function StudentManagement() {
       setMessage({ type: 'error', text: 'Student not found.' });
       return;
     }
+    
+    const adminToken = localStorage.getItem('adminToken');
+    if (!adminToken) {
+        setMessage({ type: 'error', text: 'Admin token missing. Please log in to perform this action.' });
+        return;
+    }
+    
     try {
       const response = await fetch(`http://localhost:5000/api/schoolPortalStudents/${studentToDeleteData._id}`, {
         method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${adminToken}`, 
+        }
       });
       if (response.ok) {
         setStudents(prevStudents => prevStudents.filter(student => student.admissionNo !== studentToDelete));
@@ -237,6 +318,11 @@ function StudentManagement() {
     setStudentToDelete(null);
   };
   
+  const closeRegSuccessModal = () => {
+      setIsRegSuccessModalOpen(false);
+      setNewlyRegisteredStudent(null);
+  };
+
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
   };
@@ -284,6 +370,14 @@ function StudentManagement() {
   
   if (loadingStudents) {
       return <div className="content-section">Loading student data...</div>;
+  }
+  
+  if (fetchError) {
+      return (
+          <div className="content-section" style={{ color: '#dc3545', fontWeight: 'bold', padding: '20px', border: '1px solid #dc3545', borderRadius: '5px' }}>
+              Error fetching data: {fetchError}. Please log in or check the API connection.
+          </div>
+      );
   }
   
   return (
@@ -364,15 +458,21 @@ function StudentManagement() {
             <input
               type="text"
               id="admissionNo"
-              placeholder={isNewStudentMode ? "Admission No. (Auto-generated)" : "Admission No. (Manual)"}
-              value={isNewStudentMode ? generateAdmissionNumber() : newStudent.admissionNo}
-              readOnly={isNewStudentMode}
+              placeholder={isNewStudentMode ? generateAdmissionNumber() : "Admission No. (Manual)"}
+              // ⭐️ FIX 2: Bind value directly to state to allow manual input.
+              value={newStudent.admissionNo}
+              readOnly={isNewStudentMode && !isEditing}
               disabled={isNewStudentMode && !isEditing}
               onChange={handleChange}
               required={!isNewStudentMode}
               className={formErrors.admissionNo ? 'input-error' : ''}
             />
             {formErrors.admissionNo && <p className="error-text">{formErrors.admissionNo}</p>}
+            {isNewStudentMode && !isEditing && (
+              <p style={{ fontSize: '0.8em', color: '#555' }}>
+                * Auto-generated: {generateAdmissionNumber()}
+              </p>
+            )}
           </div>
           <div className="form-group">
             <label htmlFor="parentName">Parent/Guardian Name:</label>
@@ -580,12 +680,22 @@ function StudentManagement() {
           </table>
         </div>
       </div>
+      {/* Existing Deletion Modal */}
       <ConfirmModal
         isOpen={isModalOpen}
         message={`Are you sure you want to delete student with Admission No: ${studentToDelete}?`}
         onConfirm={confirmDelete}
         onCancel={cancelDelete}
       />
+      {/* Registration Success Modal */}
+      {newlyRegisteredStudent && (
+          <ConfirmModal
+              isOpen={isRegSuccessModalOpen}
+              message={`Success! Student ${newlyRegisteredStudent.firstName} ${newlyRegisteredStudent.lastName} has been registered with Admission No: ${newlyRegisteredStudent.admissionNo}.`}
+              onConfirm={closeRegSuccessModal}
+              onCancel={closeRegSuccessModal} // Both actions close the acknowledgment modal
+          />
+      )}
     </div>
   );
 }
