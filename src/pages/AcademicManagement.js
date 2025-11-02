@@ -9,8 +9,12 @@ function AcademicManagement() {
   const navigate = useNavigate();
   const [loggedInAdmin, setLoggedInAdmin] = useState(null);
 
-  // Update hook to get data from the backend
-  const [subjects, setSubjects, loadingSubjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
+  // 1. FIX: useLocalStorage for local persistence only (no API URL)
+  const [subjects, setSubjects] = useLocalStorage('schoolPortalSubjects', []);
+
+  // NEW: State for API loading and fetching errors.
+  const [loadingSubjects, setLoadingSubjects] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
 
   const [newSubject, setNewSubject] = useState({
     subjectName: '',
@@ -46,12 +50,55 @@ function AcademicManagement() {
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('loggedInUser'));
+    const adminToken = localStorage.getItem('adminToken'); // Get the token
+
     if (user && user.type === 'admin') {
       setLoggedInAdmin(user);
     } else {
+      // Navigate to login if not authenticated as admin
       navigate('/login');
+      return;
     }
-  }, [navigate]);
+    
+    // 2. FIX: Dedicated useEffect for secure data fetch
+    const fetchSubjects = async () => {
+        setLoadingSubjects(true);
+        setFetchError(null);
+        
+        if (!adminToken) {
+            setFetchError('No Admin Token found. Please log in to view subjects.');
+            setLoadingSubjects(false);
+            return;
+        }
+        
+        try {
+            const response = await fetch('http://localhost:5000/api/schoolPortalSubjects', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${adminToken}`, // CRITICAL FIX
+                },
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || `Failed to fetch subjects (Status: ${response.status}).`);
+            }
+
+            const data = await response.json();
+            setSubjects(data);
+            
+        } catch (err) {
+            setFetchError(err.message || 'An unexpected error occurred during subject fetch.');
+            console.error('Fetch error:', err);
+        } finally {
+            setLoadingSubjects(false);
+        }
+    };
+    
+    fetchSubjects();
+
+  }, [navigate, setSubjects]); // Added setSubjects to dependency array
 
   const validateForm = () => {
     let errors = {};
@@ -73,6 +120,7 @@ function AcademicManagement() {
     }));
   };
 
+  // 3. FIX: Secure API call for submit (POST/PUT)
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage(null);
@@ -81,11 +129,22 @@ function AcademicManagement() {
       return;
     }
 
+    const adminToken = localStorage.getItem('adminToken');
+    if (!adminToken) {
+        showAlert('Authentication failed: Admin token missing. Please log in.');
+        return;
+    }
+
+    const secureHeaders = { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken}`, // CRITICAL FIX
+    };
+
     try {
         if (isEditing) {
             const response = await fetch(`http://localhost:5000/api/schoolPortalSubjects/${editSubjectId}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: secureHeaders,
                 body: JSON.stringify(newSubject),
             });
             if (response.ok) {
@@ -101,7 +160,7 @@ function AcademicManagement() {
         } else {
             const response = await fetch('http://localhost:5000/api/schoolPortalSubjects', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: secureHeaders,
                 body: JSON.stringify(newSubject),
             });
             if (response.ok) {
@@ -110,7 +169,7 @@ function AcademicManagement() {
                 showAlert('New subject added successfully!');
             } else {
                 const errorData = await response.json();
-                showAlert(errorData.message || 'Failed to add new subject.');
+                showAlert(errorData.message || 'Failed to add new subject. Check if the subject code is already in use.');
             }
         }
     } catch (err) {
@@ -139,18 +198,29 @@ function AcademicManagement() {
     }
   };
 
+  // 4. FIX: Secure API call for delete
   const deleteSubject = (subjectCodeToDelete) => {
     showConfirm(
       `Are you sure you want to delete subject: ${subjectCodeToDelete}?`,
       async () => {
+        const adminToken = localStorage.getItem('adminToken');
+        if (!adminToken) {
+            showAlert('Authentication failed: Admin token missing. Please log in.');
+            return;
+        }
+
         const subjectToDelete = subjects.find(s => s.subjectCode === subjectCodeToDelete);
         if (!subjectToDelete) {
             showAlert('Subject not found.');
             return;
         }
+
         try {
             const response = await fetch(`http://localhost:5000/api/schoolPortalSubjects/${subjectToDelete._id}`, {
                 method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${adminToken}`, // CRITICAL FIX
+                }
             });
             if (response.ok) {
                 setSubjects(prevSubjects => prevSubjects.filter(subject => subject.subjectCode !== subjectCodeToDelete));
@@ -190,6 +260,14 @@ function AcademicManagement() {
 
   if (!loggedInAdmin || loadingSubjects) {
     return <div className="content-section">Loading subjects data...</div>;
+  }
+  
+  if (fetchError) {
+      return (
+          <div className="content-section" style={{ color: '#dc3545', fontWeight: 'bold', padding: '20px', border: '1px solid #dc3545', borderRadius: '5px' }}>
+              Error fetching data: {fetchError}. Please log in or check the API connection.
+          </div>
+      );
   }
 
   return (
