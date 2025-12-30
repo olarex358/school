@@ -1,27 +1,27 @@
 // src/pages/MarkAttendance.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import useLocalStorage from '../hooks/useLocalStorage';
+import { useData } from '../context/DataContext';
 import ConfirmModal from '../components/ConfirmModal';
+import { db } from '../firebase/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 
 function MarkAttendance() {
   const navigate = useNavigate();
   const [loggedInStaff, setLoggedInStaff] = useState(null);
 
-  // Data from localStorage
-  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
-  const [attendanceRecords, setAttendanceRecords] = useLocalStorage('schoolPortalAttendance', [], 'http://localhost:5000/api/schoolPortalAttendance');
-  const [staffs] = useLocalStorage('schoolPortalStaff', [], 'http://localhost:5000/api/schoolPortalStaff');
+  const {
+    students, attendanceRecords, setAttendanceRecords, staffs,
+    loading, error
+  } = useData();
 
-  // Form states
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   const [studentsInClass, setStudentsInClass] = useState([]);
   const [currentAttendance, setCurrentAttendance] = useState({});
   const [message, setMessage] = useState(null);
 
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
   const [isModalAlert, setIsModalAlert] = useState(false);
@@ -31,6 +31,21 @@ function MarkAttendance() {
     setModalMessage(msg);
     setIsModalAlert(true);
     setIsModalOpen(true);
+  };
+
+  const addNotification = async (title, body, recipientType, recipientId = null) => {
+    try {
+      await addDoc(collection(db, 'notifications'), {
+        title,
+        body,
+        recipientType,
+        recipientId,
+        isRead: false,
+        timestamp: serverTimestamp()
+      });
+    } catch (error) {
+      console.error("Error adding notification:", error);
+    }
   };
 
   useEffect(() => {
@@ -111,6 +126,7 @@ function MarkAttendance() {
         const deletePromises = recordsToDelete.map(rec =>
             fetch(`http://localhost:5000/api/schoolPortalAttendance/${rec._id}`, {
                 method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
             })
         );
         await Promise.all(deletePromises);
@@ -118,17 +134,32 @@ function MarkAttendance() {
         const createPromises = newRecords.map(rec =>
             fetch('http://localhost:5000/api/schoolPortalAttendance', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
                 body: JSON.stringify(rec),
             })
         );
         await Promise.all(createPromises);
 
-        const updatedResponse = await fetch('http://localhost:5000/api/schoolPortalAttendance');
+        const updatedResponse = await fetch('http://localhost:5000/api/schoolPortalAttendance', {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+
         if (updatedResponse.ok) {
             const updatedRecords = await updatedResponse.json();
             setAttendanceRecords(updatedRecords);
             showAlert(`Attendance for ${selectedClass} on ${selectedDate} saved successfully!`);
+            
+            // Send notifications for absent students
+            newRecords.forEach(rec => {
+              if (rec.status === 'Absent') {
+                const student = students.find(s => s.admissionNo === rec.studentId);
+                addNotification(
+                  `Student Absent: ${student.firstName} ${student.lastName}`,
+                  `Student ${student.firstName} ${student.lastName} was marked absent for class ${rec.class} on ${rec.date}.`,
+                  'admin'
+                );
+              }
+            });
         } else {
             showAlert('Failed to save attendance. Please try again.');
         }
@@ -142,8 +173,12 @@ function MarkAttendance() {
     return student ? `${student.firstName} ${student.lastName}` : 'Unknown Student';
   };
 
-  if (!loggedInStaff) {
+  if (!loggedInStaff || loading) {
     return <div className="content-section">Access Denied. Please log in as a Teacher.</div>;
+  }
+  
+  if (error) {
+    return <div className="content-section">Error loading data: {error.message}</div>;
   }
 
   const isSubmitDisabled = !selectedClass || !selectedDate || studentsInClass.length === 0;

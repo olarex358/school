@@ -1,30 +1,40 @@
 // src/pages/LoginPage.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+<<<<<<< HEAD
 import useLocalStorage from '../hooks/useLocalStorage';
+=======
+import { useAuth } from '../hooks/AuthContext'; // Import useAuth
+>>>>>>> 43d3b0a7c0d7b74746bad289efef32546e041793
 import logo from './logo.png';
+import ConfirmModal from '../components/ConfirmModal';
 
 function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { login } = useAuth(); // Get login function from AuthContext
 
-  // Load all relevant user data from localStorage using our custom hook
-  const [adminUsers] = useLocalStorage('schoolPortalUsers', []);
-  const [students] = useLocalStorage('schoolPortalStudents', []);
-  const [staffs] = useLocalStorage('schoolPortalStaff', []);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+  const [isModalAlert, setIsModalAlert] = useState(false);
 
   useEffect(() => {
     setError('');
   }, []);
+
+  const showAlert = (msg) => {
+    setModalMessage(msg);
+    setIsModalAlert(true);
+    setIsModalOpen(true);
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
 
     try {
-      // Send login data to our backend API
       const response = await fetch('http://localhost:5000/api/login', {
         method: 'POST',
         headers: {
@@ -35,8 +45,8 @@ function LoginPage() {
 
       if (response.ok) {
         const data = await response.json();
-        const user = data.user;
         
+<<<<<<< HEAD
         // Determine the user type from the backend response
         let userType = user.type;
 
@@ -48,8 +58,13 @@ function LoginPage() {
 
         // Store user data in localStorage
         localStorage.setItem('loggedInUser', JSON.stringify({ ...user, type: userType }));
+=======
+        // Use AuthContext login instead of localStorage directly
+        login(data.token); // This will handle token storage and user decoding
+>>>>>>> 43d3b0a7c0d7b74746bad289efef32546e041793
         
-        // Redirect to the appropriate dashboard based on user type from backend
+        // Redirect to the appropriate dashboard
+        const userType = data.user.type;
         if (userType === 'admin') {
           navigate('/dashboard'); 
         } else if (userType === 'student') {
@@ -58,7 +73,6 @@ function LoginPage() {
           navigate('/staff-dashboard');
         }
       } else {
-        // Handle failed login
         const errorData = await response.json();
         setError(errorData.message || 'Login failed.');
       }
@@ -70,6 +84,13 @@ function LoginPage() {
 
   return (
     <div className="login-page">
+      <ConfirmModal
+        isOpen={isModalOpen}
+        message={modalMessage}
+        onConfirm={() => setIsModalOpen(false)}
+        onCancel={() => setIsModalOpen(false)}
+        isAlert={isModalAlert}
+      />
       <header>
         <img src={logo} alt="logo" width="150px" height="150px" />
       </header>
@@ -103,5 +124,8 @@ function LoginPage() {
     </div>
   );
 }
+// In your browser console, check what's being sent
+console.log('Username:', document.getElementById('username').value);
+console.log('Password:', document.getElementById('password').value);
 
 export default LoginPage;

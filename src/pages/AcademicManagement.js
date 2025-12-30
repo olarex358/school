@@ -3,12 +3,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useLocalStorage from '../hooks/useLocalStorage';
 import ConfirmModal from '../components/ConfirmModal';
-
+import { useData } from '../context/DataContext';
 
 function AcademicManagement() {
   const navigate = useNavigate();
   const [loggedInAdmin, setLoggedInAdmin] = useState(null);
 
+<<<<<<< HEAD
   // 1. FIX: useLocalStorage for local persistence only (no API URL)
   const [subjects, setSubjects] = useLocalStorage('schoolPortalSubjects', []);
 
@@ -16,6 +17,11 @@ function AcademicManagement() {
   const [loadingSubjects, setLoadingSubjects] = useState(true);
   const [fetchError, setFetchError] = useState(null);
 
+=======
+  // Update hook to get data from the backend
+  const { subjects, loading, error, setSubjects } = useData();
+const loadingSubjects = loading; // Map the centralized loading state to the local variable
+>>>>>>> 43d3b0a7c0d7b74746bad289efef32546e041793
   const [newSubject, setNewSubject] = useState({
     subjectName: '',
     subjectCode: ''

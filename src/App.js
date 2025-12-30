@@ -1,7 +1,8 @@
 // src/App.js
-import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import React from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import './App.css';
+<<<<<<< HEAD
 
 // Import offline utilities
 import { initDB } from './utils/offlineDB';
@@ -11,8 +12,11 @@ import OfflineBanner from './components/OfflineBanner';
 
 
 // Import Header and Footer
+=======
+>>>>>>> 43d3b0a7c0d7b74746bad289efef32546e041793
 import Header from './components/Header';
 import Footer from './components/Footer';
+import { useAuth } from './hooks/AuthContext';
 
 // Import all page components
 import LoginPage from './pages/LoginPage';
@@ -61,6 +65,7 @@ import UserDigitalLibrary from './pages/UserDigitalLibrary';
 import AdminCertificationManagement from './pages/AdminCertificationManagement';
 import StudentCertificationRegistration from './pages/StudentCertificationRegistration';
 
+<<<<<<< HEAD
 // Helper component for protected routes
 const ProtectedRoute = ({ children, allowedTypes }) => {
   const loggedInUser = JSON.parse(localStorage.getItem('loggedInUser'));
@@ -80,11 +85,33 @@ const ProtectedRoute = ({ children, allowedTypes }) => {
     if (loggedInUser.type === 'staff') return <Navigate to="/staff-dashboard" replace />;
     return <Navigate to="/login" replace />;
   }
+=======
+import { hasPermission } from './permissions';
+
+const ProtectedRoute = ({ children }) => {
+  const location = useLocation();
+  const { user } = useAuth();
+  
+  // Determine the user's role. Use 'guest' if not logged in.
+  const userRole = user ? user.type : 'guest';
+  
+  // Check if the user has permission to access the current route
+  if (!hasPermission(userRole, location.pathname)) {
+    // Redirect logic for unauthorized users
+    if (user) {
+      if (user.type === 'admin') return <Navigate to="/dashboard" replace />;
+      if (user.type === 'student') return <Navigate to="/student-dashboard" replace />;
+      if (user.type === 'staff') return <Navigate to="/staff-dashboard" replace />;
+    }
+    return <Navigate to="/login" replace />;
+  }
+>>>>>>> 43d3b0a7c0d7b74746bad289efef32546e041793
   
   return children;
 };
 
 function App() {
+<<<<<<< HEAD
   const [loggedInUser, setLoggedInUser] = useState(() => {
     try {
       const user = localStorage.getItem('loggedInUser');
@@ -302,45 +329,53 @@ function App() {
         padding: '20px',
         minHeight: 'calc(100vh - 120px)'
       }}>
+=======
+  const { user } = useAuth();
+
+  return (
+    <div className="App">
+      <Header />
+      <main style={{ flexGrow: 1, padding: '20px' }}>
+>>>>>>> 43d3b0a7c0d7b74746bad289efef32546e041793
         <Routes>
-          {/* Public Routes */}
+          {/* Public Routes - no protection needed */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/home" element={<HomePage />} />
           <Route path="/" element={<HomePage />} />
 
-          {/* Admin Protected Routes */}
-          <Route path="/dashboard" element={<ProtectedRoute allowedTypes={['admin']}><Dashboard /></ProtectedRoute>} />
-          <Route path="/student-management" element={<ProtectedRoute allowedTypes={['admin']}><StudentManagement /></ProtectedRoute>} />
-          <Route path="/staff-management" element={<ProtectedRoute allowedTypes={['admin']}><StaffManagement /></ProtectedRoute>} />
-          <Route path="/results-management" element={<ProtectedRoute allowedTypes={['admin']}><ResultsManagement /></ProtectedRoute>} />
-          <Route path="/admin-results-approval" element={<ProtectedRoute allowedTypes={['admin']}><AdminResultsApproval /></ProtectedRoute>} />
-          <Route path="/view-reports" element={<ProtectedRoute allowedTypes={['admin']}><ViewReports /></ProtectedRoute>} />
-          <Route path="/academic-management" element={<ProtectedRoute allowedTypes={['admin']}><AcademicManagement /></ProtectedRoute>} />
-          <Route path="/user-permissions-management" element={<ProtectedRoute allowedTypes={['admin']}><UserPermissionsManagement /></ProtectedRoute>} />
-          <Route path="/admin-messaging" element={<ProtectedRoute allowedTypes={['admin']}><AdminMessaging /></ProtectedRoute>} />
-          <Route path="/admin-fees-management" element={<ProtectedRoute allowedTypes={['admin']}><AdminFeesManagement /></ProtectedRoute>} />
-          <Route path="/admin-calendar-management" element={<ProtectedRoute allowedTypes={['admin']}><AdminCalendarManagement /></ProtectedRoute>} />
-          <Route path="/admin-syllabus-management" element={<ProtectedRoute allowedTypes={['admin']}><AdminSyllabusManagement /></ProtectedRoute>} />
-          <Route path="/admin-timetable-management" element={<ProtectedRoute allowedTypes={['admin']}><AdminTimetableManagement /></ProtectedRoute>} />
-          <Route path="/admin-digital-library" element={<ProtectedRoute allowedTypes={['admin']}><AdminDigitalLibrary /></ProtectedRoute>} />
-          <Route path="/admin-certification-management" element={<ProtectedRoute allowedTypes={['admin']}><AdminCertificationManagement /></ProtectedRoute>} />
+          {/* All other routes are now protected by the single ProtectedRoute component */}
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/student-management" element={<ProtectedRoute><StudentManagement /></ProtectedRoute>} />
+          <Route path="/staff-management" element={<ProtectedRoute><StaffManagement /></ProtectedRoute>} />
+          <Route path="/results-management" element={<ProtectedRoute><ResultsManagement /></ProtectedRoute>} />
+          <Route path="/admin-results-approval" element={<ProtectedRoute><AdminResultsApproval /></ProtectedRoute>} />
+          <Route path="/view-reports" element={<ProtectedRoute><ViewReports /></ProtectedRoute>} />
+          <Route path="/academic-management" element={<ProtectedRoute><AcademicManagement /></ProtectedRoute>} />
+          <Route path="/user-permissions-management" element={<ProtectedRoute><UserPermissionsManagement /></ProtectedRoute>} />
+          <Route path="/admin-messaging" element={<ProtectedRoute><AdminMessaging /></ProtectedRoute>} />
+          <Route path="/admin-fees-management" element={<ProtectedRoute><AdminFeesManagement /></ProtectedRoute>} />
+          <Route path="/admin-calendar-management" element={<ProtectedRoute><AdminCalendarManagement /></ProtectedRoute>} />
+          <Route path="/admin-syllabus-management" element={<ProtectedRoute><AdminSyllabusManagement /></ProtectedRoute>} />
+          <Route path="/admin-timetable-management" element={<ProtectedRoute><AdminTimetableManagement /></ProtectedRoute>} />
+          <Route path="/admin-digital-library" element={<ProtectedRoute><AdminDigitalLibrary /></ProtectedRoute>} />
+          <Route path="/admin-certification-management" element={<ProtectedRoute><AdminCertificationManagement /></ProtectedRoute>} />
 
-          {/* Student Protected Routes */}
-          <Route path="/student-dashboard" element={<ProtectedRoute allowedTypes={['student']}><StudentDashboard /></ProtectedRoute>} />
-          <Route path="/student-profile" element={<ProtectedRoute allowedTypes={['student']}><StudentProfile /></ProtectedRoute>} />
-          <Route path='/student-results' element={<ProtectedRoute allowedTypes={['student']}><StudentResults /></ProtectedRoute>} />
-          <Route path='/student-syllabus' element={<ProtectedRoute allowedTypes={['student']}><StudentSyllabus /></ProtectedRoute>} />
-          <Route path='/student-certification' element={<ProtectedRoute allowedTypes={['student']}><StudentCertification /></ProtectedRoute>} />
-          <Route path='/student-attendance' element={<ProtectedRoute allowedTypes={['student']}><StudentAttendance /></ProtectedRoute>} />
-          <Route path='/student-subjects' element={<ProtectedRoute allowedTypes={['student']}><StudentSubjects /></ProtectedRoute>} />
-          <Route path='/student-calendar' element={<ProtectedRoute allowedTypes={['student']}><StudentCalendar /></ProtectedRoute>} />
-          <Route path='/student-fees' element={<ProtectedRoute allowedTypes={['student']}><StudentFees /></ProtectedRoute>} />
-          <Route path='/student-mails' element={<ProtectedRoute allowedTypes={['student']}><StudentMails /></ProtectedRoute>} />
-          <Route path='/student-password-change' element={<ProtectedRoute allowedTypes={['student']}><StudentPasswordChange /></ProtectedRoute>} />
-          <Route path='/student-timetable' element={<ProtectedRoute allowedTypes={['student']}><StudentTimetable /></ProtectedRoute>} />
-          <Route path='/student-digital-library' element={<ProtectedRoute allowedTypes={['student']}><UserDigitalLibrary /></ProtectedRoute>} />
-          <Route path='/student-certification-registration' element={<ProtectedRoute allowedTypes={['student']}><StudentCertificationRegistration /></ProtectedRoute>} />
+          <Route path="/student-dashboard" element={<ProtectedRoute><StudentDashboard /></ProtectedRoute>} />
+          <Route path="/student-profile" element={<ProtectedRoute><StudentProfile /></ProtectedRoute>} />
+          <Route path='/student-results' element={<ProtectedRoute><StudentResults /></ProtectedRoute>} />
+          <Route path='/student-syllabus' element={<ProtectedRoute><StudentSyllabus /></ProtectedRoute>} />
+          <Route path='/student-certification' element={<ProtectedRoute><StudentCertification /></ProtectedRoute>} />
+          <Route path='/student-attendance' element={<ProtectedRoute><StudentAttendance /></ProtectedRoute>} />
+          <Route path='/student-subjects' element={<ProtectedRoute><StudentSubjects /></ProtectedRoute>} />
+          <Route path='/student-calendar' element={<ProtectedRoute><StudentCalendar /></ProtectedRoute>} />
+          <Route path='/student-fees' element={<ProtectedRoute><StudentFees /></ProtectedRoute>} />
+          <Route path='/student-mails' element={<ProtectedRoute><StudentMails /></ProtectedRoute>} />
+          <Route path='/student-password-change' element={<ProtectedRoute><StudentPasswordChange /></ProtectedRoute>} />
+          <Route path='/student-timetable' element={<ProtectedRoute><StudentTimetable /></ProtectedRoute>} />
+          <Route path='/student-digital-library' element={<ProtectedRoute><UserDigitalLibrary /></ProtectedRoute>} />
+          <Route path='/student-certification-registration' element={<ProtectedRoute><StudentCertificationRegistration /></ProtectedRoute>} />
 
+<<<<<<< HEAD
           {/* Staff Protected Routes */}
           <Route path="/staff-dashboard" element={<ProtectedRoute allowedTypes={['staff']}><StaffDashboard/></ProtectedRoute>} />
           <Route path="/staff-profile" element={<ProtectedRoute allowedTypes={['staff']}><StaffProfile /></ProtectedRoute>} />
@@ -375,6 +410,19 @@ function App() {
               </button>
             </div>
           } />
+=======
+          <Route path="/staff-dashboard" element={<ProtectedRoute><StaffDashboard /></ProtectedRoute>} />
+          <Route path="/staff-profile" element={<ProtectedRoute><StaffProfile /></ProtectedRoute>} />
+          <Route path="/staff-subjects" element={<ProtectedRoute><StaffSubjects /></ProtectedRoute>} />
+          <Route path="/staff-calendar" element={<ProtectedRoute><StaffCalendar /></ProtectedRoute>} />
+          <Route path="/staff-mails" element={<ProtectedRoute><StaffMails /></ProtectedRoute>} />
+          <Route path="/staff-password-change" element={<ProtectedRoute><StaffPasswordChange /></ProtectedRoute>} />
+          <Route path="/mark-attendance" element={<ProtectedRoute><MarkAttendance /></ProtectedRoute>} />
+          <Route path="/staff-timetable" element={<ProtectedRoute><StaffTimetable /></ProtectedRoute>} />
+          <Route path="/staff-digital-library" element={<ProtectedRoute><UserDigitalLibrary /></ProtectedRoute>} />
+          
+          <Route path="*" element={<h2>404 - Page Not Found</h2>} />
+>>>>>>> 43d3b0a7c0d7b74746bad289efef32546e041793
         </Routes>
       </main>
 

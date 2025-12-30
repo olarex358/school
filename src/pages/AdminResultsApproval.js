@@ -1,18 +1,14 @@
 // src/pages/AdminResultsApproval.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import useLocalStorage from '../hooks/useLocalStorage';
+import { useData } from '../context/DataContext';
 
 function AdminResultsApproval() {
   const navigate = useNavigate();
   const [loggedInAdmin, setLoggedInAdmin] = useState(null);
 
-  // Update hooks to get data from the backend
-  const [pendingResults, setPendingResults, loadingPending] = useLocalStorage('schoolPortalPendingResults', [], 'http://localhost:5000/api/schoolPortalPendingResults');
-  const [approvedResults, setApprovedResults, loadingApproved] = useLocalStorage('schoolPortalResults', [], 'http://localhost:5000/api/schoolPortalResults');
-  const [students] = useLocalStorage('schoolPortalStudents', [], 'http://localhost:5000/api/schoolPortalStudents');
-  const [subjects] = useLocalStorage('schoolPortalSubjects', [], 'http://localhost:5000/api/schoolPortalSubjects');
-  const [staffs] = useLocalStorage('schoolPortalStaff', [], 'http://localhost:5000/api/schoolPortalStaff');
+  // Use the useData hook to get data from the centralized context
+  const { pendingResults, approvedResults, students, subjects, staffs, loading, error, setPendingResults, setResults } = useData();
 
   const [message, setMessage] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -27,6 +23,7 @@ function AdminResultsApproval() {
     }
   }, [navigate]);
 
+  // Helper functions to get names
   const getStudentName = (admissionNo) => {
     const student = students.find(s => s.admissionNo === admissionNo);
     return student ? `${student.firstName} ${student.lastName}` : 'Unknown Student';
@@ -38,104 +35,95 @@ function AdminResultsApproval() {
   };
 
   const getTeacherName = (staffId) => {
-    const teacher = staffs.find(s => s.staffId === staffId);
-    return teacher ? `${teacher.firstname} ${teacher.surname}` : 'Unknown Teacher';
+    const staff = staffs.find(s => s.staffId === staffId);
+    return staff ? `${staff.firstname} ${staff.surname}` : 'Unknown Staff';
   };
 
   const handleApprove = async (resultId) => {
-    if (window.confirm('Are you sure you want to approve this result?')) {
-      const resultToApprove = pendingResults.find(r => r.id === resultId);
-      if (!resultToApprove) {
-        setMessage({ type: 'error', text: 'Result not found in pending list.' });
-        return;
-      }
-      const approvedResult = { ...resultToApprove, status: 'Approved' };
+    const resultToApprove = pendingResults.find(res => res.id === resultId);
+    if (!resultToApprove) return;
 
-      try {
-        // 1. Send a POST request to add the approved result to the 'results' collection
-        const addResponse = await fetch('http://localhost:5000/api/schoolPortalResults', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(approvedResult),
-        });
+    // Call the backend API to move the result from pending to approved
+    try {
+      const response = await fetch(`http://localhost:5000/api/schoolPortalResults`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(resultToApprove)
+      });
+      if (!response.ok) throw new Error('Failed to approve result.');
+      
+      const newApprovedResult = await response.json();
 
-        // 2. Send a DELETE request to remove the result from the 'pendingResults' collection
-        const deleteResponse = await fetch(`http://localhost:5000/api/schoolPortalPendingResults/${resultToApprove._id}`, {
-          method: 'DELETE',
-        });
+      // Remove from pending list and add to approved list in the context
+      const updatedPendingResults = pendingResults.filter(res => res.id !== resultId);
+      setPendingResults(updatedPendingResults);
+      setResults([...approvedResults, newApprovedResult]);
 
-        if (addResponse.ok && deleteResponse.ok) {
-          // Update local state after successful backend operations
-          setPendingResults(prevPending => prevPending.filter(r => r.id !== resultId));
-          setApprovedResults(prevApproved => [...prevApproved, approvedResult]);
-          setMessage({ type: 'success', text: 'Result approved and moved to final records.' });
-        } else {
-          setMessage({ type: 'error', text: 'Failed to approve result. Please try again.' });
-        }
-      } catch (err) {
-        setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
-      }
+      setMessage('Result approved successfully!');
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error) {
+      console.error('Error approving result:', error);
+      setMessage('Failed to approve result.');
+      setTimeout(() => setMessage(null), 3000);
     }
   };
 
   const handleReject = async (resultId) => {
-    if (window.confirm('Are you sure you want to reject this result?')) {
-      const resultToReject = pendingResults.find(r => r.id === resultId);
-      if (!resultToReject) {
-        setMessage({ type: 'error', text: 'Result not found in pending list.' });
-        return;
-      }
-      try {
-        const response = await fetch(`http://localhost:5000/api/schoolPortalPendingResults/${resultToReject._id}`, {
-          method: 'DELETE',
-        });
-        if (response.ok) {
-          setPendingResults(prevPending => prevPending.filter(r => r.id !== resultId));
-          setMessage({ type: 'success', text: 'Result rejected and removed from pending list.' });
-        } else {
-          const errorData = await response.json();
-          setMessage({ type: 'error', text: errorData.message || 'Failed to reject result.' });
+    const resultToReject = pendingResults.find(res => res.id === resultId);
+    if (!resultToReject) return;
+
+    // Call the backend API to delete the pending result
+    try {
+      const response = await fetch(`http://localhost:5000/api/schoolPortalPendingResults/${resultId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
-      } catch (err) {
-        setMessage({ type: 'error', text: 'An unexpected error occurred. Please check your network connection.' });
-      }
+      });
+      if (!response.ok) throw new Error('Failed to reject result.');
+
+      // Remove from pending list in the context
+      const updatedPendingResults = pendingResults.filter(res => res.id !== resultId);
+      setPendingResults(updatedPendingResults);
+      
+      setMessage('Result rejected successfully!');
+      setTimeout(() => setMessage(null), 3000);
+    } catch (error) {
+      console.error('Error rejecting result:', error);
+      setMessage('Failed to reject result.');
+      setTimeout(() => setMessage(null), 3000);
     }
   };
 
   const filteredPendingResults = pendingResults.filter(result =>
     getStudentName(result.studentNameSelect).toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getSubjectName(result.subjectSelect).toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getTeacherName(result.submittedBy).toLowerCase().includes(searchTerm.toLowerCase())
+    getSubjectName(result.subjectSelect).toLowerCase().includes(searchTerm.toLowerCase())
   );
-  
-  if (!loggedInAdmin) {
-    return <div className="content-section">Access Denied. Please log in as an Admin.</div>;
+
+  if (loading) {
+    return <div>Loading...</div>;
   }
 
-  if (loadingPending || loadingApproved) {
-    return <div className="content-section">Loading pending results...</div>;
+  if (error) {
+    return <div>Error: {error}</div>;
   }
 
   return (
-    <div className="content-section">
-      <h1>Results Approval</h1>
-      <p>Review and manage results submitted by teachers for approval.</p>
-
-      <div className="sub-section">
-        <h2>Pending Results ({pendingResults.length})</h2>
-        {message && (
-          <div style={{ padding: '10px', marginBottom: '15px', borderRadius: '5px', color: 'white', backgroundColor: message.type === 'success' ? '#28a745' : '#dc3545' }}>
-            {message.text}
-          </div>
-        )}
-
-        <input
-          type="text"
-          placeholder="Search by student, subject, or teacher"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ width: '100%', padding: '8px', marginBottom: '15px' }}
-        />
+    <div className="admin-results-approval-page">
+      <div className="admin-content">
+        <h2>Results Approval Management</h2>
+        {message && <p className="message">{message}</p>}
+        <div className="search-and-export">
+          <input
+            type="text"
+            placeholder="Search pending results..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
 
         <div className="table-container">
           <table>
