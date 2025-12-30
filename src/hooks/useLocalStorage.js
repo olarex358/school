@@ -1,45 +1,49 @@
-// src/hooks/useLocalStorage.js
 import { useState, useEffect } from 'react';
 
-/**
- * Custom hook for managing state that persists in localStorage.
- * Designed ONLY for local state persistence.
- * @param {string} key The key under which the data is stored in localStorage.
- * @param {any} initialValue The default value if nothing is found in localStorage.
- * @returns {[any, Function, boolean]} [storedValue, setStoredValue, isLoading]
- */
 function useLocalStorage(key, initialValue) {
-  // Use a state variable to track if the initial load from localStorage is complete
-  const [isLoading, setIsLoading] = useState(true);
-
-  // State to store our value, initialized from localStorage or initialValue
-  const [storedValue, setStoredValue] = useState(() => {
+  // Get from local storage then parse stored json or return initialValue
+  const readValue = () => {
     try {
-      // Get from local storage by key
       const item = window.localStorage.getItem(key);
-      // Parse stored json or return initialValue
-      return item && item !== 'undefined' ? JSON.parse(item) : initialValue;
+      return item ? JSON.parse(item) : initialValue;
     } catch (error) {
-      // If error, return initialValue
-      console.error(`Error reading localStorage key “${key}”:`, error);
+      console.warn(`Error reading localStorage key "${key}":`, error);
       return initialValue;
     }
-  });
+  };
 
-  // Effect to handle writing the storedValue back to localStorage whenever it changes.
-  useEffect(() => {
+  // State to store our value
+  const [storedValue, setStoredValue] = useState(readValue);
+
+  // Return a wrapped version of useState's setter function that persists the new value to localStorage.
+  const setValue = (value) => {
     try {
-      window.localStorage.setItem(key, JSON.stringify(storedValue));
-      // Set loading to false once the state has been initialized from localStorage
-      // and written back.
-      setIsLoading(false); 
+      // Allow value to be a function so we have same API as useState
+      const valueToStore = value instanceof Function ? value(storedValue) : value;
+      
+      // Save state
+      setStoredValue(valueToStore);
+      
+      // Save to local storage
+      window.localStorage.setItem(key, JSON.stringify(valueToStore));
     } catch (error) {
-      console.error(`Error writing to localStorage key “${key}”:`, error);
+      console.warn(`Error setting localStorage key "${key}":`, error);
     }
-  }, [key, storedValue]);
+  };
 
-  // We return the state, the setter, and the local storage loading status
-  return [storedValue, setStoredValue, isLoading];
+  // Listen for changes to this localStorage key from other tabs/windows
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === key && e.newValue) {
+        setStoredValue(JSON.parse(e.newValue));
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [key]);
+
+  return [storedValue, setValue];
 }
 
 export default useLocalStorage;

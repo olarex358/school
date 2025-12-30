@@ -2,11 +2,19 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
-// Import Header and Footer - these will now be general for all pages
+
+// Import offline utilities
+import { initDB } from './utils/offlineDB';
+import { offlineApi } from './services/offlineApi';
+import { useNetworkStatus, useSyncStatus } from './hooks/useNetworkStatus';
+import OfflineBanner from './components/OfflineBanner';
+
+
+// Import Header and Footer
 import Header from './components/Header';
 import Footer from './components/Footer';
 
-// Import all your page components with correct paths
+// Import all page components
 import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
 import StudentProfile from './pages/StudentProfile';
@@ -38,52 +46,45 @@ import StaffCalendar from './pages/StaffCalendar';
 import StaffMails from './pages/StaffMails';
 import StaffPasswordChange from './pages/StaffPasswordChange';
 
-// Import Admin Messaging
+// Import Admin components
 import AdminMessaging from './pages/AdminMessaging';
 import AdminFeesManagement from './pages/AdminFeesManagement';
-
-// Import Admin Calendar and Syllabus Management
 import AdminCalendarManagement from './pages/AdminCalendarManagement';
 import AdminSyllabusManagement from './pages/AdminSyllabusManagement';
-import MarkAttendance from './pages/MarkAttendance'
+import MarkAttendance from './pages/MarkAttendance';
 import AdminResultsApproval from './pages/AdminResultsApproval';
 import AdminTimetableManagement from './pages/AdminTimetableManagement';
 import StudentTimetable from './pages/StudentTimetable';
 import StaffTimetable from './pages/StaffTimetable';
 import AdminDigitalLibrary from './pages/AdminDigitalLibrary';
 import UserDigitalLibrary from './pages/UserDigitalLibrary';
-// CORRECTED IMPORT:
 import AdminCertificationManagement from './pages/AdminCertificationManagement';
 import StudentCertificationRegistration from './pages/StudentCertificationRegistration';
+
 // Helper component for protected routes
 const ProtectedRoute = ({ children, allowedTypes }) => {
   const loggedInUser = JSON.parse(localStorage.getItem('loggedInUser'));
-  console.log('ProtectedRoute check:');
-  console.log('loggedInUser:',loggedInUser);
-  console.log('allowedTypes:',allowedTypes);
-  if (!loggedInUser) { console.log('->Not loggedin,redirecting to /login');
+  
+  if (!loggedInUser) {
     return <Navigate to="/login" replace />;
   }
 
-  // Ensure allowedTypes is always an array before using .includes
   if (allowedTypes && !Array.isArray(allowedTypes)) {
-      console.error("ProtectedRoute: allowedTypes must be an array.");
-    return <Navigate to="/login" replace />; // Or redirect to a generic error page
+    console.error("ProtectedRoute: allowedTypes must be an array.");
+    return <Navigate to="/login" replace />;
   }
 
-  if (allowedTypes && !allowedTypes.includes(loggedInUser.type))
-    { console.log('-> User type not allowed,redirectig based on type');
+  if (allowedTypes && !allowedTypes.includes(loggedInUser.type)) {
     if (loggedInUser.type === 'admin') return <Navigate to="/dashboard" replace />;
     if (loggedInUser.type === 'student') return <Navigate to="/student-dashboard" replace />;
     if (loggedInUser.type === 'staff') return <Navigate to="/staff-dashboard" replace />;
-    return <Navigate to="/login" replace />; // Fallback
-  }console.log('->Access granted');
+    return <Navigate to="/login" replace />;
+  }
+  
   return children;
 };
 
-
 function App() {
-  // Robust initialization of loggedInUser state from localStorage
   const [loggedInUser, setLoggedInUser] = useState(() => {
     try {
       const user = localStorage.getItem('loggedInUser');
@@ -93,27 +94,218 @@ function App() {
       return null;
     }
   });
-  // Effect to listen for localStorage changes for loggedInUser (e.g., logout from another tab)
+
+  const { isOnline, showOfflineBanner } = useNetworkStatus();
+  const { syncStatus, updateSyncStatus } = useSyncStatus();
+  const [isOfflineInitialized, setIsOfflineInitialized] = useState(false);
+  const [appStatus, setAppStatus] = useState({
+    message: 'Initializing...',
+    progress: 0
+  });
+
+  // Initialize offline database
   useEffect(() => {
-    const handleStorageChange = () => {
-      const user = localStorage.getItem('loggedInUser');
-      setLoggedInUser(user ? JSON.parse(user) : null);
+    const initializeOfflineFeatures = async () => {
+      try {
+        setAppStatus({ message: 'Initializing offline database...', progress: 20 });
+        
+        // Initialize IndexedDB
+        await initDB();
+        console.log('✅ IndexedDB initialized');
+        setAppStatus({ message: 'Database ready', progress: 40 });
+        
+        // Check for pending sync if online
+        if (navigator.onLine) {
+          setAppStatus({ message: 'Checking for pending sync...', progress: 60 });
+          await offlineApi.syncPendingOperations();
+        }
+        
+        // Pre-load essential data based on user type
+        const user = JSON.parse(localStorage.getItem('loggedInUser'));
+        if (user && navigator.onLine) {
+          setAppStatus({ message: 'Pre-loading data...', progress: 80 });
+          await preloadEssentialData(user.type);
+        }
+        
+        setAppStatus({ message: 'Ready', progress: 100 });
+        setIsOfflineInitialized(true);
+        
+        console.log('🚀 Offline features initialized successfully');
+        
+      } catch (error) {
+        console.error('❌ Failed to initialize offline features:', error);
+        setAppStatus({ 
+          message: `Initialization error: ${error.message}`, 
+          progress: 100 
+        });
+        setIsOfflineInitialized(true); // Still set to true to allow app to function
+      }
     };
+
+    initializeOfflineFeatures();
+  }, []);
+
+  // Function to pre-load essential data
+  const preloadEssentialData = async (userType) => {
+    try {
+      console.log(`📥 Pre-loading data for ${userType}...`);
+      
+      const loadPromises = [];
+      
+      // Common data for all users
+      loadPromises.push(offlineApi.get('schoolPortalSubjects'));
+      
+      switch (userType) {
+        case 'admin':
+          loadPromises.push(
+            offlineApi.get('schoolPortalStudents'),
+            offlineApi.get('schoolPortalStaff'),
+            offlineApi.get('schoolPortalUsers'),
+            offlineApi.get('schoolPortalCalendarEvents')
+          );
+          break;
+        case 'student':
+          loadPromises.push(
+            offlineApi.get('schoolPortalStudents'),
+            offlineApi.get('schoolPortalCalendarEvents'),
+            offlineApi.get('schoolPortalTimetables')
+          );
+          break;
+        case 'staff':
+          loadPromises.push(
+            offlineApi.get('schoolPortalStudents'),
+            offlineApi.get('schoolPortalStaff'),
+            offlineApi.get('schoolPortalTimetables')
+          );
+          break;
+      }
+      
+      await Promise.allSettled(loadPromises);
+      console.log('✅ Essential data pre-loaded successfully');
+      
+    } catch (error) {
+      console.warn('⚠️ Some data failed to pre-load:', error);
+    }
+  };
+
+  // Sync when coming back online
+  useEffect(() => {
+    const handleOnline = async () => {
+      if (loggedInUser) {
+        console.log('🌐 Back online, checking for sync...');
+        
+        // Small delay to ensure network is stable
+        setTimeout(async () => {
+          await offlineApi.syncPendingOperations();
+          await updateSyncStatus(offlineApi);
+        }, 3000);
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [loggedInUser, updateSyncStatus]);
+
+  // Periodic sync check
+  useEffect(() => {
+    if (!isOnline) return;
+    
+    const interval = setInterval(async () => {
+      await updateSyncStatus(offlineApi);
+    }, 30000); // Check every 30 seconds
+    
+    return () => clearInterval(interval);
+  }, [isOnline, updateSyncStatus]);
+
+  // Listen for storage changes (logout from other tabs)
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'loggedInUser') {
+        const user = localStorage.getItem('loggedInUser');
+        setLoggedInUser(user ? JSON.parse(user) : null);
+      }
+    };
+    
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
-  // Runs once on mount and cleans up on unmount
 
+  // Show loading screen while initializing
+  if (!isOfflineInitialized) {
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: '#f5f5f5',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 9999,
+        flexDirection: 'column',
+        gap: '20px'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '60px',
+            height: '60px',
+            border: '4px solid #f3f3f3',
+            borderTop: '4px solid #3498db',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 20px'
+          }}></div>
+          <h3 style={{ marginBottom: '10px', color: '#333' }}>School Portal</h3>
+          <p style={{ color: '#666', marginBottom: '20px' }}>{appStatus.message}</p>
+          
+          {/* Progress bar */}
+          <div style={{
+            width: '300px',
+            height: '6px',
+            backgroundColor: '#e0e0e0',
+            borderRadius: '3px',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              width: `${appStatus.progress}%`,
+              height: '100%',
+              backgroundColor: '#3498db',
+              transition: 'width 0.3s ease'
+            }}></div>
+          </div>
+          
+          <p style={{ fontSize: '12px', color: '#999', marginTop: '20px' }}>
+            {isOnline ? '🌐 Online' : '📴 Offline'} • Initializing offline capabilities...
+          </p>
+        </div>
+        
+        <style>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
     <div className="App">
-      <Header /> {/* Always render Header */}
-<main style={{ flexGrow: 1, padding: '20px' }}>
+      <OfflineBanner />
+      
+      <Header />
+      
+      <main style={{ 
+        flexGrow: 1, 
+        padding: '20px',
+        minHeight: 'calc(100vh - 120px)'
+      }}>
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/home" element={<HomePage />} />
-          {/* Default / route now always shows HomePage */}
           <Route path="/" element={<HomePage />} />
 
           {/* Admin Protected Routes */}
@@ -163,11 +355,30 @@ function App() {
           <Route path="/staff-digital-library" element={<ProtectedRoute allowedTypes={['staff']}><UserDigitalLibrary /></ProtectedRoute>} />
 
           {/* Catch-all route for 404 pages */}
-          <Route path="*" element={<h2>404 - Page Not Found</h2>} />
+          <Route path="*" element={
+            <div style={{ textAlign: 'center', padding: '50px' }}>
+              <h2>404 - Page Not Found</h2>
+              <p>The page you're looking for doesn't exist.</p>
+              <button 
+                onClick={() => window.history.back()}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#3498db',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  marginTop: '20px'
+                }}
+              >
+                Go Back
+              </button>
+            </div>
+          } />
         </Routes>
       </main>
 
-      <Footer /> {/* Always render Footer */}
+      <Footer />
     </div>
   );
 }
